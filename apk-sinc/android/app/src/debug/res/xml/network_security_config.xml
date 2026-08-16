@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Permite trafego HTTP (nao criptografado) SOMENTE na build debug, para
+  testar contra um backend local na rede (ex.: http://192.168.0.4:8001)
+  sem precisar configurar HTTPS. A build release NAO usa este arquivo -
+  continua bloqueando cleartext por padrao, como e o correto para producao.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
