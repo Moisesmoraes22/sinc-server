@@ -19,7 +19,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
+        // Emulador: http://10.0.2.2:PORTA/  |  Dispositivo fisico: http://IP_DO_PC_NA_REDE:PORTA/
+        buildConfigField("String", "API_BASE_URL", "\"http://192.168.0.4:8001/\"")
     }
 
     buildTypes {
