@@ -352,11 +352,15 @@ nenhuma policy permissiva para `anon`/`authenticated` — só a
   máquina com o SDK instalado, mas a geração do `.apk` em si **não pôde ser
   executada dentro deste sandbox**. Isso está detalhado em
   `docs/build-android.md`.
-- Da mesma forma, não há um projeto Supabase real configurado neste
-  ambiente (nem seria apropriado commitar credenciais reais). As migrations
-  em `backend/supabase/migrations/` foram escritas e revisadas
-  manualmente, mas não puderam ser aplicadas/validadas contra um projeto
-  Supabase real a partir daqui. Toda a lógica que depende do banco foi
-  validada via `SqliteRepository`, que implementa exatamente o mesmo
-  contrato (`Repository`) e o mesmo schema — validar contra o Supabase real
-  é o passo seguinte, seguindo `docs/setup-supabase.md`.
+- **Atualização:** um projeto Supabase real (`apk-sinc`,
+  ref `ajiavjvynpiqlrggzypk`) foi criado e as 6 migrations foram aplicadas
+  e validadas com sucesso (schema, índices, RLS, constraints, anti-spam —
+  ver `docs/setup-supabase.md`, seção 9). Isso foi feito via integração MCP
+  do Supabase, que não passa pelo proxy de egress deste sandbox. O que
+  **não** pôde ser validado a partir daqui é o processo do backend
+  (`uvicorn`) conversando com o Supabase via rede normal (HTTPS direto):
+  o sandbox bloqueia `*.supabase.co` no proxy de saída (mesma categoria de
+  restrição que bloqueia `dl.google.com` e a fonte real na porta 8080).
+  `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` já estão configurados em
+  `backend/.env` (fora do git) — rodar `uvicorn app.main:app` numa máquina
+  com egress normal deve funcionar sem nenhuma mudança de código.

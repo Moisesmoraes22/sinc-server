@@ -7,6 +7,15 @@ unidades monitoradas (`sync_units`), o histórico de eventos
 Python/FastAPI continua sendo quem monitora a fonte real e aplica a
 lógica de negócio — o Supabase é só o armazenamento.
 
+> **Status atual deste projeto:** já existe um projeto Supabase real criado
+> e com as migrations aplicadas — `apk-sinc` (ref `ajiavjvynpiqlrggzypk`,
+> região `sa-east-1`, URL `https://ajiavjvynpiqlrggzypk.supabase.co`).
+> As 4 tabelas, índices e RLS foram validados (ver seção 9). Se você é o
+> dono desse projeto, pule direto para a seção 4 (configurar `.env`) — só
+> falta colar a `SERVICE_ROLE_KEY` (Project Settings → API Keys). Se
+> precisar de um projeto novo (ex.: ambiente separado), siga o passo a
+> passo abaixo normalmente.
+
 ## 1. Criar o projeto no Supabase
 
 1. Acesse https://supabase.com/dashboard e crie uma conta/organização, se
@@ -164,3 +173,58 @@ nenhuma tabela fica exposta.
 Se no futuro for necessário expor leitura pública (ex.: um dashboard
 somente-leitura sem autenticação), crie uma policy explícita e restrita —
 um exemplo comentado está em `003_rls.sql`.
+
+## 9. Status da validação contra o projeto real (`apk-sinc`)
+
+As migrations 001–006 foram aplicadas com sucesso no projeto real via MCP
+do Supabase (`apply_migration`), e o schema foi validado diretamente no
+banco (não só lido do código):
+
+- **Tabelas:** `sync_units` (3 linhas de teste `TEST-0001/2/3`),
+  `sync_events` (0), `devices` (0), `monitor_settings` (1, com os valores
+  padrão 5/15/60) — confirmadas via `list_tables`.
+- **Índices:** os 13 índices esperados (a7_code único, business_unit,
+  overall_status, last_checked_at, unit_id, created_at, a7_code em
+  sync_events, new_status, fcm_token único, active) — confirmados via
+  `pg_indexes`.
+- **RLS:** habilitado nas 4 tabelas, sem policies para `anon`/`authenticated`
+  — confirmado via `get_advisors` (só aparecem avisos `INFO` esperados de
+  "RLS habilitado sem policy", que é o comportamento desejado).
+- **Constraints:** os `check` de status (`NORMAL`/`ATENCAO`/`CRITICO`) e as
+  chaves únicas (`a7_code`, `fcm_token`) foram exercitados com sucesso ao
+  simular via SQL o ciclo completo `NORMAL → ATENÇÃO → ATENÇÃO → CRÍTICO →
+  CRÍTICO → NORMAL`: exatamente 3 eventos foram gravados (não 6), provando
+  que o anti-spam também é coerente no nível de dados. Os dados dessa
+  simulação foram removidos depois de validados.
+- Foi corrigido um aviso de segurança do linter do Supabase
+  (`function_search_path_mutable`) na função de trigger `set_updated_at`
+  — ver `006_harden_function_search_path.sql`.
+
+### Duas pegadinhas encontradas e corrigidas ao conectar num projeto real
+
+1. **Formato novo de API key (`sb_secret_...`) não é aceito por
+   `supabase-py` antigo.** Projetos Supabase criados recentemente usam o
+   novo formato de chave (`sb_publishable_...` / `sb_secret_...`, sem
+   pontos), mas `supabase-py==2.9.1` (a versão originalmente fixada em
+   `requirements.txt`) valida a key com uma regex que exige formato JWT
+   (com pontos) e falha com `SupabaseException: Invalid API key`. Corrigido
+   fixando `supabase==2.31.0` em `requirements.txt`, com um teste de
+   regressão em `tests/test_supabase_client.py` garantindo que o formato
+   novo é aceito. **Se você usa uma `service_role key` no formato antigo
+   (um JWT longo começando com `eyJ...`), qualquer versão recente também
+   funciona normalmente.**
+2. **Ambientes de desenvolvimento com egress restrito podem bloquear
+   `*.supabase.co`.** O sandbox usado para construir/validar este projeto
+   tem uma política de rede que só libera HTTPS para uma lista curta de
+   hosts (registry.npmjs.org, pypi.org, etc.) — `*.supabase.co` **não**
+   está nela, então o processo do backend (`uvicorn`) não conseguiu
+   completar chamadas REST reais ao Supabase a partir de lá (erro
+   `403 Forbidden` do proxy de saída). Isso **não é um problema do código**:
+   os testes de schema/CRUD/anti-spam acima foram feitos via SQL direto no
+   projeto real (usando a integração MCP do Supabase, que não passa por
+   esse proxy), e a suíte de testes automatizados roda 100% contra SQLite,
+   sem depender de rede. **Rode o backend numa máquina com acesso normal à
+   internet** (a sua, um servidor, uma VPS) para ver
+   `GET /api/health` retornar `"database": "connected"` de verdade — não há
+   nenhuma razão para isso falhar fora de um ambiente com egress
+   restrito como este.
