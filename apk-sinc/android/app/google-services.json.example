@@ -1,0 +1,20 @@
+{
+  "_comment": "Modelo de referencia. Baixe o google-services.json real no Console do Firebase (Configuracoes do projeto > Seus apps > Android) e salve-o em android/app/google-services.json. NUNCA commite o arquivo real (ja esta no .gitignore).",
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "apk-sinc-exemplo",
+    "storage_bucket": "apk-sinc-exemplo.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+        "android_client_info": { "package_name": "com.apksinc.monitor" }
+      },
+      "oauth_client": [],
+      "api_key": [{ "current_key": "SUBSTITUA_PELA_SUA_API_KEY" }],
+      "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+    }
+  ],
+  "configuration_version": "1"
+}

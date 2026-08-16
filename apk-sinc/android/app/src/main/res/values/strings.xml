@@ -1,0 +1,43 @@
+<resources>
+    <string name="app_name">APK SINC</string>
+    <string name="app_subtitle">Monitoramento de Servidores</string>
+    <string name="notification_channel_id">sinc_alerts</string>
+    <string name="notification_channel_name">Alertas de Servidores</string>
+    <string name="notification_channel_description">Notificacoes de mudanca de status dos servidores monitorados</string>
+
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_history">Historico</string>
+    <string name="nav_settings">Configuracoes</string>
+
+    <string name="status_all_operational">Todos os sistemas operacionais</string>
+    <string name="status_some_offline">Existem servidores offline</string>
+    <string name="status_some_attention">Existem servidores em atencao</string>
+
+    <string name="servers_monitored">Servidores monitorados</string>
+    <string name="status_online">ONLINE</string>
+    <string name="status_attention">ATENCAO</string>
+    <string name="status_offline">OFFLINE</string>
+
+    <string name="label_response_time">Resposta</string>
+    <string name="label_last_check">Ultima checagem</string>
+    <string name="label_offline_since">Offline ha</string>
+
+    <string name="details_title">Detalhes do servidor</string>
+    <string name="details_address">Endereco</string>
+    <string name="details_last_down">Ultima queda</string>
+    <string name="details_last_up">Ultimo retorno</string>
+    <string name="details_down_count">Quantidade de quedas</string>
+    <string name="details_history">Historico</string>
+
+    <string name="history_filter_all">Todos</string>
+    <string name="history_filter_online">Online</string>
+    <string name="history_filter_offline">Offline</string>
+
+    <string name="settings_notifications">Notificacoes</string>
+    <string name="settings_sound">Som</string>
+    <string name="settings_vibration">Vibracao</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_refresh_interval">Intervalo de atualizacao</string>
+    <string name="settings_test_notification">Testar notificacao</string>
+    <string name="settings_about">Sobre</string>
+</resources>
