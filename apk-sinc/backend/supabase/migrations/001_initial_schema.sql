@@ -94,13 +94,18 @@ create table if not exists monitor_settings (
 comment on table monitor_settings is 'Configuracoes globais do monitor. Tabela singleton (sempre id=1).';
 
 -- updated_at automatico
+-- search_path fixado explicitamente (recomendacao do linter de seguranca do
+-- Supabase: function_search_path_mutable) para evitar sequestro via search_path.
 create or replace function set_updated_at()
-returns trigger as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
     new.updated_at = now();
     return new;
 end;
-$$ language plpgsql;
+$$;
 
 drop trigger if exists trg_sync_units_updated_at on sync_units;
 create trigger trg_sync_units_updated_at
