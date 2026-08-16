@@ -1,27 +1,31 @@
+"""Endpoint legado (dominio "servers") mantido para compatibilidade com o
+app Android existente."""
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
 
-from app.database.db import get_session
-from app.database.repository import EventRepository
-from app.models.schemas import EventListResponse, EventOut
+from app.database.base import Repository
+from app.dependencies import get_repository
+from app.models.schemas import EventListResponse
+from app.services.legacy_adapter import event_to_event_out
 
-router = APIRouter(prefix="/api/events", tags=["events"])
-
-
-def _session() -> Session:
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
+router = APIRouter(prefix="/api/events", tags=["events (legacy)"])
 
 
 @router.get("", response_model=EventListResponse)
 def list_events(
     server_id: str | None = None,
-    status: str | None = Query(default=None, description="Filtrar por status destino: ONLINE, ATENCAO, OFFLINE"),
+    status: str | None = Query(default=None, description="Filtrar por status destino legado: ONLINE, ATENCAO, OFFLINE"),
     limit: int = 200,
-    session: Session = Depends(_session),
+    repository: Repository = Depends(get_repository),
 ) -> EventListResponse:
-    events = EventRepository(session).list_all(server_id=server_id, status=status, limit=limit)
-    return EventListResponse(events=[EventOut.model_validate(e) for e in events])
+    # `status` chega no vocabulario legado (ONLINE/ATENCAO/OFFLINE); o
+    # repository filtra pelo vocabulario novo (NORMAL/ATENCAO/CRITICO).
+    new_status = None
+    if status:
+        for new, legacy in {"NORMAL": "ONLINE", "ATENCAO": "ATENCAO", "CRITICO": "OFFLINE"}.items():
+            if legacy == status.upper():
+                new_status = new
+                break
+
+    events = repository.list_events(unit_a7_code=server_id, status=new_status, limit=limit)
+    return EventListResponse(events=[event_to_event_out(e) for e in events])

@@ -12,21 +12,28 @@ Messaging — mesmo com o app fechado.
 ## Arquitetura (resumo)
 
 ```
-Fonte de monitoramento -> Backend (polling + máquina de estados) -> FCM -> App Android
+Fonte de monitoramento -> Backend (polling + máquina de estados) -> Supabase (PostgreSQL) -> FCM -> App Android
 ```
 
 O Android **nunca** monitora sozinho: ele é cliente da API do backend e
-receptor passivo de notificações push. Toda a lógica de detecção de queda/
-retorno, anti-spam e histórico vive no backend. Detalhes completos em
+receptor passivo de notificações push. Toda a lógica de detecção de
+mudança de status, anti-spam e histórico vive no backend. O **Supabase**
+(PostgreSQL) é o banco principal — armazena unidades monitoradas, histórico
+de eventos, dispositivos e configurações; o backend continua sendo o único
+responsável por consultar a fonte real e aplicar a regra de negócio (o
+Supabase nunca substitui o monitor). Detalhes completos em
 [`docs/architecture.md`](docs/architecture.md).
 
 ## Estrutura do projeto
 
 ```
 apk-sinc/
-├── android/     # App Android (Kotlin + Jetpack Compose + MVVM)
-├── backend/     # API + monitoramento (Python + FastAPI)
-├── docs/        # Documentação técnica
+├── android/                    # App Android (Kotlin + Jetpack Compose + MVVM)
+├── backend/                    # API + monitoramento (Python + FastAPI)
+│   ├── app/                    # código do backend (monitor, services, database, routers)
+│   ├── supabase/migrations/    # schema SQL do banco principal (Supabase/PostgreSQL)
+│   └── tests/                  # testes automatizados (sempre via SQLite, nunca Supabase real)
+├── docs/                       # Documentação técnica
 └── README.md
 ```
 
@@ -39,11 +46,14 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # SOURCE_MODE=mock por padrão
+cp .env.example .env          # SOURCE_MODE=mock, DB_BACKEND=supabase por padrão
 uvicorn app.main:app --reload
 ```
 
-Veja [`docs/setup-backend.md`](docs/setup-backend.md) para detalhes.
+Para configurar o Supabase (obrigatório em produção), veja
+[`docs/setup-supabase.md`](docs/setup-supabase.md). Para desenvolver sem um
+projeto Supabase, use `DB_BACKEND=sqlite` no `.env`. Veja
+[`docs/setup-backend.md`](docs/setup-backend.md) para detalhes gerais.
 
 ### Testes do backend
 
@@ -52,9 +62,10 @@ cd backend
 .venv/bin/python -m pytest -v
 ```
 
-22 testes cobrindo a máquina de estados, anti-spam, parsing da fonte real
-(JSON e HTML) e o ciclo completo de monitoramento. Ver
-[`docs/testing.md`](docs/testing.md).
+37 testes cobrindo a máquina de estados (baseada em tempo decorrido),
+anti-spam, o repository (SQLite, mesmo contrato do Supabase), parsing da
+fonte real (JSON e HTML), o ciclo completo de monitoramento e a API. Nenhum
+teste depende de um Supabase real. Ver [`docs/testing.md`](docs/testing.md).
 
 ### Android
 
@@ -79,24 +90,36 @@ testar o sistema inteiro.
 
 ## Regras de negócio principais
 
-- Status: `ONLINE` → `ATENÇÃO` (1ª falha) → `ATENÇÃO` (2ª falha) →
-  `OFFLINE` (3ª falha consecutiva). Configurável via `.env`.
-- Notificação push disparada **apenas** nas transições `* → OFFLINE` e
-  `OFFLINE → ONLINE` — nunca em falhas isoladas ou repetidas enquanto já
-  offline (anti-spam).
-- Histórico completo de eventos por servidor, com duração da indisponibilidade.
+- Cada unidade (`sync_units`, identificada por código A7) tem `send_status`
+  e `receive_status` calculados pelo tempo decorrido desde o último
+  envio/recebimento, comparado a limites configuráveis
+  (`monitor_settings.warning_threshold_minutes` / `critical_threshold_minutes`,
+  padrão 5 / 15 minutos). `overall_status` é o pior entre os dois:
+  `NORMAL` → `ATENÇÃO` → `CRÍTICO`.
+- Notificação push disparada **apenas** quando `overall_status` muda de
+  valor entre um ciclo e outro — nunca ao repetir o mesmo status
+  (anti-spam).
+- Histórico completo de eventos por unidade (`sync_events`), com duração
+  da indisponibilidade calculada automaticamente na resolução.
+- Para o app Android, esse domínio é traduzido para o vocabulário legado
+  `ONLINE`/`ATENÇÃO`/`OFFLINE` nos endpoints `/api/servers` e
+  `/api/events`, sem exigir nenhuma mudança no app.
 
 ## Segurança
 
-Nenhuma credencial (Firebase Admin SDK, `google-services.json`, tokens) é
-commitada — todas ficam fora do controle de versão via `.gitignore` e são
-fornecidas por variáveis de ambiente / arquivos locais. Ver
-`backend/.env.example` e `docs/setup-firebase.md`.
+Nenhuma credencial (Supabase `SERVICE_ROLE_KEY`, Firebase Admin SDK,
+`google-services.json`, tokens) é commitada — todas ficam fora do controle
+de versão via `.gitignore` e são fornecidas por variáveis de ambiente /
+arquivos locais. A `SERVICE_ROLE_KEY` do Supabase existe **somente no
+backend** e nunca é enviada ao app Android, que fala apenas com a API
+FastAPI. Ver `backend/.env.example`, `docs/setup-supabase.md` e
+`docs/setup-firebase.md`.
 
 ## Documentação
 
 - [`docs/architecture.md`](docs/architecture.md) — arquitetura completa e investigação da fonte
 - [`docs/setup-backend.md`](docs/setup-backend.md) — instalação e configuração do backend
+- [`docs/setup-supabase.md`](docs/setup-supabase.md) — criação do projeto Supabase, migrations e `.env`
 - [`docs/setup-firebase.md`](docs/setup-firebase.md) — configuração do Firebase Cloud Messaging
 - [`docs/build-android.md`](docs/build-android.md) — build do app e geração do APK
 - [`docs/testing.md`](docs/testing.md) — como rodar e o que cobrem os testes

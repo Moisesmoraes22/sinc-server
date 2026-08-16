@@ -1,91 +1,66 @@
-from app.services.state_machine import ServerState, evaluate
+from app.models.domain import ATENCAO, CRITICO, NORMAL
+from app.services.state_machine import compute_overall, compute_status, evaluate, should_notify
+
+WARNING = 5
+CRITICAL = 15
 
 
-def test_first_failure_goes_to_attention():
-    state = ServerState(status="ONLINE", consecutive_failures=0)
-    t = evaluate(state, is_up=False)
-    assert t.new_status == "ATENCAO"
-    assert t.consecutive_failures == 1
-    assert t.should_notify is False
+def test_elapsed_below_warning_is_normal():
+    assert compute_status(2, WARNING, CRITICAL) == NORMAL
 
 
-def test_second_failure_stays_attention():
-    state = ServerState(status="ATENCAO", consecutive_failures=1)
-    t = evaluate(state, is_up=False)
-    assert t.new_status == "ATENCAO"
-    assert t.consecutive_failures == 2
-    assert t.should_notify is False
+def test_elapsed_at_warning_threshold_is_attention():
+    assert compute_status(5, WARNING, CRITICAL) == ATENCAO
+    assert compute_status(10, WARNING, CRITICAL) == ATENCAO
 
 
-def test_third_consecutive_failure_goes_offline_and_notifies():
-    state = ServerState(status="ATENCAO", consecutive_failures=2)
-    t = evaluate(state, is_up=False)
-    assert t.new_status == "OFFLINE"
-    assert t.consecutive_failures == 3
-    assert t.should_notify is True
+def test_elapsed_at_critical_threshold_is_critical():
+    assert compute_status(15, WARNING, CRITICAL) == CRITICO
+    assert compute_status(60, WARNING, CRITICAL) == CRITICO
 
 
-def test_recovery_from_offline_notifies():
-    state = ServerState(status="OFFLINE", consecutive_failures=3)
-    t = evaluate(state, is_up=True)
-    assert t.new_status == "ONLINE"
-    assert t.consecutive_failures == 0
-    assert t.should_notify is True
+def test_no_data_ever_is_critical():
+    assert compute_status(None, WARNING, CRITICAL) == CRITICO
 
 
-def test_recovery_from_attention_does_not_notify():
-    state = ServerState(status="ATENCAO", consecutive_failures=1)
-    t = evaluate(state, is_up=True)
-    assert t.new_status == "ONLINE"
-    assert t.should_notify is False
+def test_overall_is_the_worst_of_send_and_receive():
+    assert compute_overall(NORMAL, NORMAL) == NORMAL
+    assert compute_overall(NORMAL, ATENCAO) == ATENCAO
+    assert compute_overall(ATENCAO, NORMAL) == ATENCAO
+    assert compute_overall(ATENCAO, CRITICO) == CRITICO
+    assert compute_overall(CRITICO, NORMAL) == CRITICO
 
 
-def test_repeated_offline_failures_do_not_renotify():
-    """Anti-spam: uma vez OFFLINE, novas falhas nao devem gerar nova notificacao."""
-    state = ServerState(status="OFFLINE", consecutive_failures=5)
-    t = evaluate(state, is_up=False)
-    assert t.new_status == "OFFLINE"
-    assert t.should_notify is False
+def test_should_notify_only_on_change():
+    assert should_notify(NORMAL, NORMAL) is False
+    assert should_notify(NORMAL, ATENCAO) is True
+    assert should_notify(ATENCAO, ATENCAO) is False
+    assert should_notify(ATENCAO, CRITICO) is True
+    assert should_notify(CRITICO, CRITICO) is False
+    assert should_notify(CRITICO, NORMAL) is True
 
 
-def test_already_online_success_does_not_notify():
-    state = ServerState(status="ONLINE", consecutive_failures=0)
-    t = evaluate(state, is_up=True)
-    assert t.new_status == "ONLINE"
-    assert t.should_notify is False
+def test_evaluate_builds_full_result():
+    result = evaluate(
+        previous_overall_status=NORMAL,
+        send_elapsed_minutes=20,
+        receive_elapsed_minutes=1,
+        warning_threshold_minutes=WARNING,
+        critical_threshold_minutes=CRITICAL,
+    )
+    assert result.send_status == CRITICO
+    assert result.receive_status == NORMAL
+    assert result.overall_status == CRITICO
+    assert result.should_notify is True
 
 
-def test_full_flapping_then_recovery_sequence():
-    """ONLINE, OFFLINE, OFFLINE, OFFLINE, OFFLINE, OFFLINE -> so uma notificacao de queda."""
-    state = ServerState(status="ONLINE", consecutive_failures=0)
-    notifications = []
-    for is_up in [False, False, False, False, False]:
-        t = evaluate(state, is_up)
-        if t.should_notify:
-            notifications.append(t.new_status)
-        state = ServerState(status=t.new_status, consecutive_failures=t.consecutive_failures)
-
-    assert notifications == ["OFFLINE"]
-    assert state.status == "OFFLINE"
-
-    # volta a responder -> uma notificacao de retorno
-    t = evaluate(state, is_up=True)
-    assert t.should_notify is True
-    assert t.new_status == "ONLINE"
-
-    # cai novamente -> deve notificar de novo apos atingir o threshold
-    state = ServerState(status=t.new_status, consecutive_failures=t.consecutive_failures)
-    notifications2 = []
-    for is_up in [False, False, False]:
-        t = evaluate(state, is_up)
-        if t.should_notify:
-            notifications2.append(t.new_status)
-        state = ServerState(status=t.new_status, consecutive_failures=t.consecutive_failures)
-    assert notifications2 == ["OFFLINE"]
-
-
-def test_configurable_thresholds():
-    state = ServerState(status="ONLINE", consecutive_failures=0)
-    t = evaluate(state, is_up=False, failure_threshold_attention=1, failure_threshold_offline=1)
-    assert t.new_status == "OFFLINE"
-    assert t.should_notify is True
+def test_evaluate_no_notification_when_status_repeats():
+    result = evaluate(
+        previous_overall_status=CRITICO,
+        send_elapsed_minutes=30,
+        receive_elapsed_minutes=30,
+        warning_threshold_minutes=WARNING,
+        critical_threshold_minutes=CRITICAL,
+    )
+    assert result.overall_status == CRITICO
+    assert result.should_notify is False

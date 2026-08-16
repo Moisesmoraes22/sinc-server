@@ -12,7 +12,7 @@ def set_scenario(payload: MockScenarioRequest) -> dict:
     settings = get_settings()
     if settings.source_mode != "mock":
         raise HTTPException(status_code=400, detail="SOURCE_MODE nao esta em 'mock'")
-    get_mock_client().set_scenario(payload.server_id, payload.sequence)
+    get_mock_client().set_scenario(payload.a7_code, payload.sequence)
     return {"status": "ok"}
 
 

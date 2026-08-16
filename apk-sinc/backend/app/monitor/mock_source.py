@@ -1,59 +1,73 @@
-"""Fonte simulada (MOCK), usada quando SOURCE_MODE=mock.
+"""Fonte simulada (MOCK) do monitor de sincronizacao.
 
-Permite desenvolvimento e testes sem depender da infraestrutura real.
-Suporta cenarios controlados via `set_scenario`, usados nos testes de
-anti-spam, tres falhas consecutivas e recuperacao.
+Usada quando SOURCE_MODE=mock, para desenvolver e testar sem depender da
+infraestrutura real. Os dados simulados sao persistidos normalmente no
+repository configurado (Supabase ou SQLite) - o MOCK so troca a origem dos
+dados, nao o destino.
+
+Cada chamada a `fetch_units` representa um "tick" (uma checagem). E
+possivel forcar uma sequencia de status por unidade via `set_scenario`,
+usando os proprios rotulos de status (NORMAL/ATENCAO/CRITICO) - o mock
+traduz cada rotulo em um tempo decorrido desde o ultimo envio/recebimento
+compativel com os thresholds padrao (5 / 15 minutos), o que e suficiente
+para exercitar a maquina de estados real (services/state_machine.py) de
+ponta a ponta.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from app.models.schemas import ServerReading
+from app.models.domain import ATENCAO, CRITICO, NORMAL, SyncUnitReading
 
-DEFAULT_SERVERS = [
-    {"id": "server-principal", "name": "Servidor Principal"},
-    {"id": "server-erp", "name": "Servidor ERP"},
-    {"id": "server-banco-dados", "name": "Banco de Dados"},
-    {"id": "server-api-vendas", "name": "API de Vendas"},
+DEFAULT_UNITS = [
+    {"a7_code": "A7-0001", "business_unit": "Unidade Matriz"},
+    {"a7_code": "A7-0002", "business_unit": "Unidade Filial Sul"},
+    {"a7_code": "A7-0003", "business_unit": "Unidade Filial Norte"},
+    {"a7_code": "A7-0004", "business_unit": "Unidade Filial Leste"},
 ]
+
+# Minutos decorridos usados para cada rotulo de cenario, coerentes com os
+# thresholds padrao (warning=5, critical=15) semeados em
+# supabase/migrations/004_seed_settings.sql.
+_ELAPSED_MINUTES_FOR_LABEL = {
+    NORMAL: 1,
+    ATENCAO: 8,
+    CRITICO: 25,
+}
 
 
 class MockSourceClient:
-    """Cliente simulado. Cada chamada a `fetch_servers` avanca um "tick".
+    def __init__(self, units: list[dict] | None = None):
+        self.units = units if units is not None else DEFAULT_UNITS
+        self._scenarios: dict[str, list[str]] = {}
 
-    Por padrao todos os servidores respondem "up". E possivel forcar uma
-    sequencia de resultados ("up"/"down") por servidor via `set_scenario`,
-    que e consumida em ordem a cada tick subsequente; ao esgotar a
-    sequencia, o servidor volta ao padrao "up".
-    """
-
-    def __init__(self, servers: list[dict] | None = None):
-        self.servers = servers if servers is not None else DEFAULT_SERVERS
-        self._scenarios: dict[str, list[bool]] = {}
-
-    def set_scenario(self, server_id: str, sequence: list[str]) -> None:
-        self._scenarios[server_id] = [s.lower() == "up" for s in sequence]
+    def set_scenario(self, a7_code: str, sequence: list[str]) -> None:
+        """sequence: lista de "NORMAL" | "ATENCAO" | "CRITICO" (case-insensitive),
+        consumida em ordem a cada tick. Ao esgotar, volta ao padrao NORMAL."""
+        self._scenarios[a7_code] = [s.upper() for s in sequence]
 
     def clear_scenarios(self) -> None:
         self._scenarios = {}
 
-    def _next_status(self, server_id: str) -> bool:
-        queue = self._scenarios.get(server_id)
+    def _next_label(self, a7_code: str) -> str:
+        queue = self._scenarios.get(a7_code)
         if queue:
             return queue.pop(0)
-        return True
+        return NORMAL
 
-    async def fetch_servers(self) -> list[ServerReading]:
+    async def fetch_units(self) -> list[SyncUnitReading]:
         now = datetime.now(timezone.utc)
         readings = []
-        for server in self.servers:
-            is_up = self._next_status(server["id"])
+        for unit in self.units:
+            label = self._next_label(unit["a7_code"])
+            elapsed = _ELAPSED_MINUTES_FOR_LABEL.get(label, _ELAPSED_MINUTES_FOR_LABEL[NORMAL])
+            reference = now - timedelta(minutes=elapsed)
             readings.append(
-                ServerReading(
-                    external_id=server["id"],
-                    name=server["name"],
-                    raw_status="online" if is_up else "offline",
-                    is_up=is_up,
-                    response_time_ms=120 if is_up else None,
+                SyncUnitReading(
+                    a7_code=unit["a7_code"],
+                    business_unit=unit["business_unit"],
+                    revisions_to_send=0 if label == NORMAL else 5,
+                    last_send_at=reference,
+                    last_receive_at=reference,
                     checked_at=now,
                 )
             )

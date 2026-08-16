@@ -1,21 +1,23 @@
-"""Cliente para a fonte real de monitoramento.
+"""Cliente para a fonte real de monitoramento de sincronizacao.
 
 IMPORTANTE: este cliente NAO PUDE ser validado contra a URL real durante o
 desenvolvimento porque o ambiente de build nao tem rota de rede ate
 `cli-1237.ddns.a7cloud.net.br:8080` (ver docs/architecture.md, secao 1).
 
-O parser abaixo foi escrito para ser tolerante a dois formatos plausiveis
-para um endpoint chamado ".../monitorsincronizacao/":
+O endpoint (".../monitorsincronizacao/") sugere fortemente um monitor de
+sincronizacao por unidade de negocio (codigo A7), com timestamps de ultimo
+envio/recebimento - e esse e o modelo de dominio adotado
+(app/models/domain.py: SyncUnitReading). O parser abaixo e tolerante a
+nomes de campo em portugues/ingles e a dois formatos plausiveis:
 
-1. JSON estruturado (lista de servidores com nome/status) - tentado primeiro.
-2. HTML com uma tabela ou lista de linhas "nome + status" - fallback via
-   BeautifulSoup, procurando por palavras-chave ONLINE/OFFLINE/ATIVO/INATIVO
-   no texto de cada linha candidata.
+1. JSON estruturado (lista de unidades) - tentado primeiro.
+2. HTML com uma tabela - fallback via BeautifulSoup, tentando casar as
+   colunas do cabecalho com os campos esperados.
 
 Assim que o endpoint puder ser inspecionado de um ambiente com acesso
-(rode `python backend/scripts/inspect_source.py`), ajuste `_parse_json` e/ou
-`_parse_html` para o formato exato encontrado, mantendo a mesma assinatura
-publica `fetch_servers()`.
+(rode `python backend/scripts/inspect_source.py`), ajuste `_parse_json`
+e/ou `_parse_html` para o formato exato encontrado, mantendo a mesma
+assinatura publica `fetch_units()`.
 """
 
 import logging
@@ -26,27 +28,53 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.config import get_settings
-from app.models.schemas import ServerReading
+from app.models.domain import SyncUnitReading
 
 logger = logging.getLogger("sinc.real_source")
 
-UP_KEYWORDS = {"online", "ok", "ativo", "up", "1", "true", "conectado"}
-DOWN_KEYWORDS = {"offline", "erro", "inativo", "down", "0", "false", "desconectado"}
+A7_CODE_KEYS = ["a7_code", "codigo_a7", "codigoa7", "a7code", "codigo", "id"]
+BUSINESS_UNIT_KEYS = ["business_unit", "unidade", "unidade_negocio", "nome", "empresa", "filial"]
+REVISIONS_KEYS = ["revisions_to_send", "revisoes_a_enviar", "revisoes", "pendentes", "pending", "revisions"]
+LAST_SEND_KEYS = ["last_send_at", "ultimo_envio", "data_envio", "envio", "send_at", "last_send"]
+LAST_RECEIVE_KEYS = ["last_receive_at", "ultimo_recebimento", "data_recebimento", "recebimento", "receive_at", "last_receive"]
+
+
+def _get_first(item: dict, keys: list[str]):
+    lower_item = {str(k).strip().lower(): v for k, v in item.items()}
+    for key in keys:
+        if key in lower_item and lower_item[key] not in (None, ""):
+            return lower_item[key]
+    return None
+
+
+def _parse_datetime(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(value, tz=timezone.utc)
+        except (ValueError, OSError):
+            return None
+    text = str(value).strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except ValueError:
+        logger.debug("Nao foi possivel parsear data/hora: %r", value)
+        return None
 
 
 def _slugify(name: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower())
-    return slug.strip("-") or "server"
-
-
-def _status_to_bool(raw_status: str) -> bool:
-    normalized = raw_status.strip().lower()
-    if normalized in UP_KEYWORDS:
-        return True
-    if normalized in DOWN_KEYWORDS:
-        return False
-    # fallback heuristico: presenca da palavra "off" indica indisponibilidade
-    return "off" not in normalized and "erro" not in normalized
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", name.strip().upper())
+    return slug.strip("-") or "UNIDADE"
 
 
 class RealSourceClient:
@@ -55,73 +83,90 @@ class RealSourceClient:
         self.url = url or settings.source_url
         self.timeout = timeout or settings.source_timeout_seconds
 
-    async def fetch_servers(self) -> list[ServerReading]:
-        started = datetime.now(timezone.utc)
+    async def fetch_units(self) -> list[SyncUnitReading]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(self.url)
             response.raise_for_status()
-        elapsed_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
-        content_type = response.headers.get("content-type", "")
-
-        if "application/json" in content_type:
-            return self._parse_json(response.json(), elapsed_ms)
 
         try:
-            return self._parse_json(response.json(), elapsed_ms)
+            return self._parse_json(response.json())
         except ValueError:
             pass
 
-        return self._parse_html(response.text, elapsed_ms)
+        return self._parse_html(response.text)
 
-    def _parse_json(self, payload, elapsed_ms: int) -> list[ServerReading]:
+    def _parse_json(self, payload) -> list[SyncUnitReading]:
         now = datetime.now(timezone.utc)
-        items = payload if isinstance(payload, list) else payload.get("servers") or payload.get("data") or []
-        readings: list[ServerReading] = []
+        items = payload if isinstance(payload, list) else payload.get("units") or payload.get("data") or payload.get("servers") or []
+        readings: list[SyncUnitReading] = []
         for item in items:
-            name = str(item.get("name") or item.get("nome") or item.get("servidor") or "desconhecido")
-            raw_status = str(item.get("status") or item.get("situacao") or item.get("state") or "")
-            external_id = str(item.get("id") or _slugify(name))
+            business_unit = str(_get_first(item, BUSINESS_UNIT_KEYS) or "Unidade desconhecida")
+            a7_code = str(_get_first(item, A7_CODE_KEYS) or _slugify(business_unit))
+            revisions = _get_first(item, REVISIONS_KEYS)
             readings.append(
-                ServerReading(
-                    external_id=external_id,
-                    name=name,
-                    raw_status=raw_status,
-                    is_up=_status_to_bool(raw_status),
-                    response_time_ms=item.get("response_time_ms") or elapsed_ms,
+                SyncUnitReading(
+                    a7_code=a7_code,
+                    business_unit=business_unit,
+                    revisions_to_send=int(revisions) if revisions is not None else None,
+                    last_send_at=_parse_datetime(_get_first(item, LAST_SEND_KEYS)),
+                    last_receive_at=_parse_datetime(_get_first(item, LAST_RECEIVE_KEYS)),
                     checked_at=now,
+                    raw=item if isinstance(item, dict) else {},
                 )
             )
         return readings
 
-    def _parse_html(self, html: str, elapsed_ms: int) -> list[ServerReading]:
+    def _parse_html(self, html: str) -> list[SyncUnitReading]:
         now = datetime.now(timezone.utc)
         soup = BeautifulSoup(html, "html.parser")
-        readings: list[ServerReading] = []
+        readings: list[SyncUnitReading] = []
 
-        rows = soup.select("table tr")
-        if rows:
-            for row in rows:
-                cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
-                if len(cells) < 2:
-                    continue
-                name, raw_status = cells[0], cells[1]
-                if not name or name.lower() in {"nome", "servidor", "name"}:
-                    continue
-                readings.append(
-                    ServerReading(
-                        external_id=_slugify(name),
-                        name=name,
-                        raw_status=raw_status,
-                        is_up=_status_to_bool(raw_status),
-                        response_time_ms=elapsed_ms,
-                        checked_at=now,
-                    )
+        table = soup.find("table")
+        if table is None:
+            logger.warning(
+                "Nao foi possivel identificar uma tabela de unidades no HTML da fonte real; "
+                "ajuste RealSourceClient._parse_html apos inspecionar o endpoint real."
+            )
+            return readings
+
+        rows = table.find_all("tr")
+        if not rows:
+            return readings
+
+        header_cells = [c.get_text(strip=True).lower() for c in rows[0].find_all(["th", "td"])]
+
+        def _col_index(keys: list[str]) -> int | None:
+            for idx, header in enumerate(header_cells):
+                if any(key in header for key in keys):
+                    return idx
+            return None
+
+        code_idx = _col_index(A7_CODE_KEYS) or 0
+        unit_idx = _col_index(BUSINESS_UNIT_KEYS)
+        send_idx = _col_index(LAST_SEND_KEYS)
+        receive_idx = _col_index(LAST_RECEIVE_KEYS)
+        revisions_idx = _col_index(REVISIONS_KEYS)
+
+        for row in rows[1:]:
+            cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
+            if not cells or len(cells) <= code_idx:
+                continue
+            a7_code = cells[code_idx]
+            if not a7_code:
+                continue
+            business_unit = cells[unit_idx] if unit_idx is not None and unit_idx < len(cells) else a7_code
+            revisions = cells[revisions_idx] if revisions_idx is not None and revisions_idx < len(cells) else None
+            last_send = cells[send_idx] if send_idx is not None and send_idx < len(cells) else None
+            last_receive = cells[receive_idx] if receive_idx is not None and receive_idx < len(cells) else None
+
+            readings.append(
+                SyncUnitReading(
+                    a7_code=a7_code,
+                    business_unit=business_unit,
+                    revisions_to_send=int(revisions) if revisions and revisions.isdigit() else None,
+                    last_send_at=_parse_datetime(last_send),
+                    last_receive_at=_parse_datetime(last_receive),
+                    checked_at=now,
                 )
-            if readings:
-                return readings
-
-        logger.warning(
-            "Nao foi possivel identificar uma tabela de servidores no HTML da fonte real; "
-            "ajuste RealSourceClient._parse_html apos inspecionar o endpoint real."
-        )
+            )
         return readings

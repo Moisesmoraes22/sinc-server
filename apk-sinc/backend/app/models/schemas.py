@@ -3,17 +3,85 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class ServerReading(BaseModel):
-    """Leitura normalizada vinda da fonte (real ou mock), antes de aplicar a maquina de estados."""
+# ---------------------------------------------------------------------
+# Dominio novo: unidades de sincronizacao (sync_units / sync_events)
+# ---------------------------------------------------------------------
+class SyncUnitOut(BaseModel):
+    id: str | None
+    a7_code: str
+    business_unit: str
+    revisions_to_send: int | None
+    last_send_at: datetime | None
+    last_receive_at: datetime | None
+    send_elapsed_minutes: float | None
+    receive_elapsed_minutes: float | None
+    send_status: str
+    receive_status: str
+    overall_status: str
+    consecutive_failures: int
+    last_checked_at: datetime | None
 
-    external_id: str
-    name: str
-    raw_status: str
-    is_up: bool
-    response_time_ms: int | None = None
-    checked_at: datetime
+    model_config = {"from_attributes": True}
 
 
+class SyncUnitListResponse(BaseModel):
+    status: str = "ok"
+    units: list[SyncUnitOut]
+
+
+class SyncEventOut(BaseModel):
+    id: int | None
+    unit_id: str | None
+    a7_code: str
+    business_unit: str
+    event_type: str
+    direction: str
+    previous_status: str | None
+    new_status: str
+    started_at: datetime | None
+    resolved_at: datetime | None
+    duration_seconds: int | None
+    message: str | None
+    created_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class SyncEventListResponse(BaseModel):
+    status: str = "ok"
+    events: list[SyncEventOut]
+
+
+class DeviceOut(BaseModel):
+    id: str | None
+    device_name: str | None
+    active: bool
+    created_at: datetime | None
+    last_seen_at: datetime | None
+    # fcm_token propositalmente omitido da resposta - e um segredo do
+    # dispositivo, sem motivo para ser exposto de volta via API.
+
+    model_config = {"from_attributes": True}
+
+
+class DeviceListResponse(BaseModel):
+    status: str = "ok"
+    devices: list[DeviceOut]
+
+
+class MonitorSettingsOut(BaseModel):
+    warning_threshold_minutes: int
+    critical_threshold_minutes: int
+    check_interval_seconds: int
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------
+# Compatibilidade com o app Android existente (dominio "servers")
+# GET /api/servers e GET /api/events continuam com este formato - o
+# aplicativo Android nao precisa de nenhuma alteracao.
+# ---------------------------------------------------------------------
 class ServerOut(BaseModel):
     id: str
     name: str
@@ -23,8 +91,6 @@ class ServerOut(BaseModel):
     last_down_at: datetime | None
     last_up_at: datetime | None
     down_count: int
-
-    model_config = {"from_attributes": True}
 
 
 class ServerListResponse(BaseModel):
@@ -42,8 +108,6 @@ class EventOut(BaseModel):
     reason: str | None
     response_time_ms: int | None
 
-    model_config = {"from_attributes": True}
-
 
 class EventListResponse(BaseModel):
     status: str = "ok"
@@ -51,10 +115,14 @@ class EventListResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    status: str = "ok"
+    status: str
+    database: str
+    monitor: str
+    firebase: str
     source_mode: str
+    db_backend: str
     last_poll_at: datetime | None
-    servers_count: int
+    units_count: int
 
 
 class DeviceRegisterRequest(BaseModel):
@@ -65,5 +133,5 @@ class DeviceRegisterRequest(BaseModel):
 class MockScenarioRequest(BaseModel):
     """Permite forcar um cenario de teste no MockSourceClient em runtime."""
 
-    server_id: str
-    sequence: list[str]  # ex: ["up", "down", "down", "down", "up"]
+    a7_code: str
+    sequence: list[str]  # ex: ["NORMAL", "ATENCAO", "CRITICO", "CRITICO", "NORMAL"]

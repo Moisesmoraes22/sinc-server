@@ -1,74 +1,78 @@
-"""Regra de transicao de status e anti-spam.
+"""Regra de status do monitor de sincronizacao.
 
-ONLINE --(falha)--> ATENCAO --(falha)--> ATENCAO --(falha)--> OFFLINE
-OFFLINE --(sucesso)--> ONLINE
-ATENCAO --(sucesso)--> ONLINE
+Diferente da primeira versao do projeto (que contava falhas consecutivas de
+"esta no ar / nao esta"), o dominio de sincronizacao classifica cada
+unidade pelo TEMPO decorrido desde o ultimo envio/recebimento, comparado
+contra limites configuraveis (`monitor_settings`):
 
-Notificacao (FCM) e disparada SOMENTE nas transicoes:
-  * qualquer coisa -> OFFLINE (perda real, apos threshold de falhas)
-  * OFFLINE -> ONLINE (recuperacao)
+    elapsed < warning_threshold_minutes                  -> NORMAL
+    warning_threshold <= elapsed < critical_threshold     -> ATENCAO
+    elapsed >= critical_threshold_minutes                  -> CRITICO
 
-Entrar em ATENCAO nao notifica. Isso e o mecanismo anti-spam: uma sequencia
-de N falhas consecutivas gera OFFLINE (e notificacao) apenas uma vez, na
-falha que cruza o threshold; falhas subsequentes enquanto ja OFFLINE nao
-geram novas notificacoes ate que o servidor volte a responder.
+send_status e receive_status sao calculados independentemente (uma unidade
+pode estar atrasada so no envio, so no recebimento, ou nos dois).
+overall_status e o pior dos dois (CRITICO > ATENCAO > NORMAL).
+
+Anti-spam: notifica-se SOMENTE quando overall_status muda de valor entre um
+ciclo e outro (ex.: NORMAL -> ATENCAO, ATENCAO -> CRITICO, CRITICO ->
+NORMAL). Repetir o mesmo status entre ciclos (ex.: CRITICO -> CRITICO)
+nunca gera nova notificacao.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
 
-from app.config import get_settings
+from app.models.domain import ATENCAO, CRITICO, NORMAL
 
-STATUS_ONLINE = "ONLINE"
-STATUS_ATTENTION = "ATENCAO"
-STATUS_OFFLINE = "OFFLINE"
+_SEVERITY = {NORMAL: 0, ATENCAO: 1, CRITICO: 2}
+
+
+def compute_status(elapsed_minutes: float | None, warning_threshold: int, critical_threshold: int) -> str:
+    """Classifica o status a partir do tempo decorrido (em minutos).
+
+    `elapsed_minutes=None` (nunca houve envio/recebimento registrado) e
+    tratado como CRITICO - unidade sem nenhum dado e o pior cenario possivel.
+    """
+    if elapsed_minutes is None:
+        return CRITICO
+    if elapsed_minutes >= critical_threshold:
+        return CRITICO
+    if elapsed_minutes >= warning_threshold:
+        return ATENCAO
+    return NORMAL
+
+
+def compute_overall(send_status: str, receive_status: str) -> str:
+    return max(send_status, receive_status, key=lambda status: _SEVERITY[status])
+
+
+def should_notify(previous_overall: str, new_overall: str) -> bool:
+    return previous_overall != new_overall
 
 
 @dataclass
-class ServerState:
-    status: str
-    consecutive_failures: int
-
-
-@dataclass
-class Transition:
-    previous_status: str
-    new_status: str
-    consecutive_failures: int
+class StatusEvaluation:
+    send_status: str
+    receive_status: str
+    overall_status: str
+    previous_overall_status: str
     should_notify: bool
-    reason: str | None = None
 
 
 def evaluate(
-    current: ServerState,
-    is_up: bool,
-    failure_threshold_attention: int | None = None,
-    failure_threshold_offline: int | None = None,
-) -> Transition:
-    settings = get_settings()
-    attention_threshold = failure_threshold_attention or settings.failure_threshold_attention
-    offline_threshold = failure_threshold_offline or settings.failure_threshold_offline
+    previous_overall_status: str,
+    send_elapsed_minutes: float | None,
+    receive_elapsed_minutes: float | None,
+    warning_threshold_minutes: int,
+    critical_threshold_minutes: int,
+) -> StatusEvaluation:
+    send_status = compute_status(send_elapsed_minutes, warning_threshold_minutes, critical_threshold_minutes)
+    receive_status = compute_status(receive_elapsed_minutes, warning_threshold_minutes, critical_threshold_minutes)
+    overall_status = compute_overall(send_status, receive_status)
 
-    if is_up:
-        new_status = STATUS_ONLINE
-        new_failures = 0
-        should_notify = current.status == STATUS_OFFLINE
-        reason = "Servidor voltou a responder" if should_notify else None
-        return Transition(current.status, new_status, new_failures, should_notify, reason)
-
-    new_failures = current.consecutive_failures + 1
-
-    if new_failures >= offline_threshold:
-        new_status = STATUS_OFFLINE
-    elif new_failures >= attention_threshold:
-        new_status = STATUS_ATTENTION
-    else:
-        new_status = current.status
-
-    should_notify = new_status == STATUS_OFFLINE and current.status != STATUS_OFFLINE
-    reason = (
-        f"{new_failures} falhas consecutivas detectadas"
-        if should_notify
-        else None
+    return StatusEvaluation(
+        send_status=send_status,
+        receive_status=receive_status,
+        overall_status=overall_status,
+        previous_overall_status=previous_overall_status,
+        should_notify=should_notify(previous_overall_status, overall_status),
     )
-    return Transition(current.status, new_status, new_failures, should_notify, reason)

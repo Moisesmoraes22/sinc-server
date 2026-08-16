@@ -14,10 +14,28 @@ class Settings(BaseSettings):
     retry_attempts: int = 3
     retry_backoff_seconds: float = 2.0
 
-    failure_threshold_attention: int = 1
-    failure_threshold_offline: int = 3
+    # Backend de persistencia: "supabase" (producao) ou "sqlite" (dev local
+    # sem depender de um projeto Supabase configurado; testes automatizados
+    # sempre usam SqliteRepository diretamente, sem passar por este flag).
+    db_backend: str = "supabase"
 
-    database_url: str = "sqlite:///./sinc.db"
+    # Supabase (PostgreSQL) - banco principal em producao.
+    # A SERVICE_ROLE_KEY tem privilegios administrativos e NUNCA deve ir
+    # para o Android nem para qualquer cliente publico - somente o backend
+    # a utiliza.
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+
+    # SQLite - usado apenas quando db_backend=sqlite (desenvolvimento local
+    # sem Supabase configurado) ou em testes.
+    sqlite_database_url: str = "sqlite:///./sinc.db"
+
+    # Valores de fallback para monitor_settings caso a tabela ainda nao
+    # tenha sido semeada (ver migrations/004_seed_settings.sql). A fonte da
+    # verdade em producao e sempre a tabela `monitor_settings` no Supabase.
+    default_warning_threshold_minutes: int = 5
+    default_critical_threshold_minutes: int = 15
+    default_check_interval_seconds: int = 60
 
     firebase_credentials_path: str = "./firebase-adminsdk.json"
     fcm_topic: str = "sinc-alerts"

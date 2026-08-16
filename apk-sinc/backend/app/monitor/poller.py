@@ -1,36 +1,37 @@
 import asyncio
 import logging
 
-from app.config import get_settings
-from app.database.db import get_session
 from app.services.monitor_service import MonitorService
 
 logger = logging.getLogger("sinc.poller")
 
 
 class Poller:
-    """Loop assincrono que roda o ciclo de checagem periodicamente, com retry."""
+    """Loop assincrono que roda o ciclo de checagem periodicamente, com retry.
 
-    def __init__(self, monitor_service: MonitorService):
+    O intervalo entre checagens e lido de `monitor_settings.check_interval_seconds`
+    (via repository) a cada ciclo, para que a mudanca de configuracao valha
+    sem precisar reiniciar o backend.
+    """
+
+    def __init__(self, monitor_service: MonitorService, retry_attempts: int, retry_backoff_seconds: float):
         self.monitor_service = monitor_service
-        self.settings = get_settings()
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         self.last_poll_at = None
 
     async def _run_cycle_with_retry(self) -> None:
-        attempts = max(1, self.settings.retry_attempts)
+        attempts = max(1, self.retry_attempts)
         for attempt in range(1, attempts + 1):
-            session = get_session()
             try:
-                await self.monitor_service.run_check_cycle(session)
+                await self.monitor_service.run_check_cycle()
                 return
             except Exception:
                 logger.exception("Falha no ciclo de monitoramento (tentativa %d/%d)", attempt, attempts)
                 if attempt < attempts:
-                    await asyncio.sleep(self.settings.retry_backoff_seconds * attempt)
-            finally:
-                session.close()
+                    await asyncio.sleep(self.retry_backoff_seconds * attempt)
 
     async def _loop(self) -> None:
         while not self._stop.is_set():
@@ -38,8 +39,15 @@ class Poller:
 
             await self._run_cycle_with_retry()
             self.last_poll_at = _dt.datetime.now(_dt.timezone.utc)
+
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=self.settings.poll_interval_seconds)
+                interval = self.monitor_service.repository.get_settings().check_interval_seconds
+            except Exception:
+                logger.exception("Falha ao ler check_interval_seconds; usando fallback de 60s")
+                interval = 60
+
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=interval)
             except asyncio.TimeoutError:
                 pass
 
