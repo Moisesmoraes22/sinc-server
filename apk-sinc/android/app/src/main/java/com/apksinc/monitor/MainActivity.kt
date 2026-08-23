@@ -4,24 +4,18 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.apksinc.monitor.navigation.SincNavHost
-import com.apksinc.monitor.ui.theme.ApkSincTheme
+import com.apksinc.monitor.navigation.OmgSincNavHost
+import com.apksinc.monitor.ui.theme.OmgSincAppTheme
 
 class MainActivity : ComponentActivity() {
-
-    companion object {
-        const val EXTRA_SERVER_ID = "extra_server_id"
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val serverId = intent?.getStringExtra(EXTRA_SERVER_ID)
-
         setContent {
-            ApkSincTheme {
-                SincNavHost(startServerId = serverId)
+            OmgSincAppTheme {
+                OmgSincNavHost()
             }
         }
     }

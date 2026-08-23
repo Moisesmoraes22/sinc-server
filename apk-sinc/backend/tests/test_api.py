@@ -63,6 +63,25 @@ def test_log_habit_marks_completed(client, repository):
     assert body["today_value"] == 2.5
 
 
+def test_create_habit(client):
+    response = client.post(
+        "/api/habits",
+        json={"title": "Beber agua", "category": CATEGORY_AGUA, "target_value": 2.5, "target_unit": "L"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["title"] == "Beber agua"
+    assert body["id"] is not None
+
+    listed = client.get("/api/habits").json()["habits"]
+    assert len(listed) == 1
+
+
+def test_create_habit_rejects_invalid_category(client):
+    response = client.post("/api/habits", json={"title": "X", "category": "NAO_EXISTE"})
+    assert response.status_code == 422
+
+
 def test_log_habit_not_found(client):
     response = client.post("/api/habits/nao-existe/log", json={"completed": True})
     assert response.status_code == 404

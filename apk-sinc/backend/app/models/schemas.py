@@ -37,6 +37,15 @@ class HabitListResponse(BaseModel):
     habits: list[HabitOut]
 
 
+class HabitCreateRequest(BaseModel):
+    title: str
+    category: str
+    icon_key: str = "circle"
+    target_value: float | None = None
+    target_unit: str | None = None
+    color_tag: str = "ACCENT"
+
+
 class HabitLogRequest(BaseModel):
     value: float | None = None
     completed: bool = True

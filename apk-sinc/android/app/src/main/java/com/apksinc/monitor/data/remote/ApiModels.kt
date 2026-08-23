@@ -2,36 +2,80 @@ package com.apksinc.monitor.data.remote
 
 import com.google.gson.annotations.SerializedName
 
-data class ServerDto(
-    val id: String,
-    val name: String,
-    val status: String,
-    @SerializedName("response_time_ms") val responseTimeMs: Int?,
-    @SerializedName("last_check") val lastCheck: String?,
-    @SerializedName("last_down_at") val lastDownAt: String?,
-    @SerializedName("last_up_at") val lastUpAt: String?,
-    @SerializedName("down_count") val downCount: Int,
+data class ProfileDto(
+    val id: String?,
+    @SerializedName("display_name") val displayName: String,
 )
 
-data class ServerListResponseDto(
-    val status: String,
-    val servers: List<ServerDto>,
+data class ProfileUpdateRequestDto(
+    @SerializedName("display_name") val displayName: String,
 )
 
-data class EventDto(
-    val id: Int,
-    @SerializedName("server_id") val serverId: String,
-    @SerializedName("server_name") val serverName: String,
-    @SerializedName("from_status") val fromStatus: String,
-    @SerializedName("to_status") val toStatus: String,
-    @SerializedName("occurred_at") val occurredAt: String,
-    val reason: String?,
-    @SerializedName("response_time_ms") val responseTimeMs: Int?,
+data class HabitDto(
+    val id: String?,
+    val title: String,
+    val category: String,
+    @SerializedName("icon_key") val iconKey: String,
+    @SerializedName("target_value") val targetValue: Double?,
+    @SerializedName("target_unit") val targetUnit: String?,
+    @SerializedName("color_tag") val colorTag: String,
+    @SerializedName("today_value") val todayValue: Double?,
+    @SerializedName("today_completed") val todayCompleted: Boolean,
 )
 
-data class EventListResponseDto(
+data class HabitListResponseDto(
     val status: String,
-    val events: List<EventDto>,
+    val habits: List<HabitDto>,
+)
+
+data class HabitCreateRequestDto(
+    val title: String,
+    val category: String,
+    @SerializedName("icon_key") val iconKey: String = "circle",
+    @SerializedName("target_value") val targetValue: Double?,
+    @SerializedName("target_unit") val targetUnit: String?,
+    @SerializedName("color_tag") val colorTag: String = "ACCENT",
+)
+
+data class HabitLogRequestDto(
+    val value: Double?,
+    val completed: Boolean,
+)
+
+data class MetricDto(
+    val id: Int?,
+    @SerializedName("metric_type") val metricType: String,
+    val value: Double,
+    @SerializedName("recorded_at") val recordedAt: String?,
+)
+
+data class MetricListResponseDto(
+    val status: String,
+    val metrics: List<MetricDto>,
+)
+
+data class MetricCreateRequestDto(
+    @SerializedName("metric_type") val metricType: String,
+    val value: Double,
+)
+
+data class HomeMetricSnapshotDto(
+    @SerializedName("metric_type") val metricType: String,
+    val value: Double?,
+    @SerializedName("recorded_at") val recordedAt: String?,
+)
+
+data class HomeSummaryResponseDto(
+    val status: String,
+    @SerializedName("greeting_name") val greetingName: String,
+    @SerializedName("weekly_progress_pct") val weeklyProgressPct: Double,
+    @SerializedName("weekly_progress_delta_pct") val weeklyProgressDeltaPct: Double,
+    @SerializedName("habits_done_today") val habitsDoneToday: Int,
+    @SerializedName("habits_total_today") val habitsTotalToday: Int,
+    @SerializedName("next_action_habit_id") val nextActionHabitId: String?,
+    @SerializedName("next_action_message") val nextActionMessage: String,
+    val metrics: List<HomeMetricSnapshotDto>,
+    val habits: List<HabitDto>,
 )
 
 data class DeviceRegisterRequestDto(

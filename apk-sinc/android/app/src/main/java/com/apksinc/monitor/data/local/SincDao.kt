@@ -4,26 +4,24 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SincDao {
 
-    @Query("SELECT * FROM servers ORDER BY name")
-    fun observeServers(): Flow<List<ServerEntity>>
-
-    @Query("SELECT * FROM servers WHERE id = :id")
-    suspend fun getServer(id: String): ServerEntity?
+    @Query("SELECT * FROM habits ORDER BY title")
+    fun observeHabits(): Flow<List<HabitEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertServers(servers: List<ServerEntity>)
+    suspend fun upsertHabits(habits: List<HabitEntity>)
 
-    @Query("SELECT * FROM events ORDER BY occurredAt DESC LIMIT :limit")
-    fun observeEvents(limit: Int = 200): Flow<List<EventEntity>>
+    @Query("DELETE FROM habits")
+    suspend fun clearHabits()
 
-    @Query("SELECT * FROM events WHERE serverId = :serverId ORDER BY occurredAt DESC")
-    fun observeEventsForServer(serverId: String): Flow<List<EventEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertEvents(events: List<EventEntity>)
+    @Transaction
+    suspend fun replaceHabits(habits: List<HabitEntity>) {
+        clearHabits()
+        upsertHabits(habits)
+    }
 }

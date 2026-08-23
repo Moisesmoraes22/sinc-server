@@ -12,10 +12,4 @@ object ViewModelFactoryProvider {
         val app = LocalContext.current.applicationContext as SincApplication
         return SincViewModelFactory(app.repository, app.settingsDataStore)
     }
-
-    @Composable
-    fun detailsFactory(serverId: String): ServerDetailsViewModelFactory {
-        val app = LocalContext.current.applicationContext as SincApplication
-        return ServerDetailsViewModelFactory(app.repository, serverId)
-    }
 }
