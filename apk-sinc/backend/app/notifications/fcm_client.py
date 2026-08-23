@@ -9,19 +9,17 @@ Se FCM_DRY_RUN=true (ou o arquivo de credenciais nao existir), o envio real
 e substituido por um log estruturado - isso permite rodar o backend inteiro
 sem depender de um projeto Firebase configurado.
 
-O envio e feito por token individual (dispositivos registrados via
-POST /api/devices, armazenados na tabela `devices` do Supabase/SQLite), e
-tambem publicado no topico de fallback (FCM_TOPIC) para compatibilidade
-com clientes que apenas assinem o topico sem registrar token.
+Uso no OMG SINC: lembretes de habito (ex.: "hora de beber agua"). O envio e
+por token individual (dispositivos registrados via POST /api/devices) e
+tambem publicado no topico de fallback (FCM_TOPIC).
 """
 
 import logging
 import os
 
 from app.config import get_settings
-from app.models.domain import CRITICO
 
-logger = logging.getLogger("sinc.fcm")
+logger = logging.getLogger("omgsinc.fcm")
 
 _firebase_app = None
 
@@ -40,19 +38,6 @@ def _get_firebase_app():
     return _firebase_app
 
 
-def _build_notification(a7_code: str, business_unit: str, new_status: str) -> tuple[str, str]:
-    if new_status == CRITICO:
-        title = "🔴 UNIDADE CRÍTICA"
-        body = f"Unidade: {business_unit} ({a7_code})\nSincronização crítica - fora do prazo esperado."
-    elif new_status == "ATENCAO":
-        title = "🟡 UNIDADE EM ATENÇÃO"
-        body = f"Unidade: {business_unit} ({a7_code})\nSincronização atrasada - acompanhe."
-    else:
-        title = "🟢 UNIDADE NORMALIZADA"
-        body = f"Unidade: {business_unit} ({a7_code})\nA sincronização voltou ao normal."
-    return title, body
-
-
 class FcmClient:
     def __init__(self):
         self.settings = get_settings()
@@ -60,11 +45,11 @@ class FcmClient:
     def _dry_run_active(self) -> bool:
         return self.settings.fcm_dry_run or not os.path.exists(self.settings.firebase_credentials_path)
 
-    def send_status_change(
-        self, a7_code: str, business_unit: str, new_status: str, device_tokens: list[str] | None = None
+    def send_habit_reminder(
+        self, habit_title: str, message: str, device_tokens: list[str] | None = None
     ) -> bool:
-        title, body = _build_notification(a7_code, business_unit, new_status)
-        data = {"a7Code": a7_code, "businessUnit": business_unit, "status": new_status}
+        title = f"✨ {habit_title}"
+        data = {"habitTitle": habit_title}
         tokens = device_tokens or []
 
         if self._dry_run_active():
@@ -73,7 +58,7 @@ class FcmClient:
                 self.settings.fcm_topic,
                 len(tokens),
                 title,
-                body,
+                message,
                 data,
             )
             return True
@@ -81,7 +66,7 @@ class FcmClient:
         from firebase_admin import messaging
 
         _get_firebase_app()
-        notification = messaging.Notification(title=title, body=body)
+        notification = messaging.Notification(title=title, body=message)
         success = True
 
         for token in tokens:
