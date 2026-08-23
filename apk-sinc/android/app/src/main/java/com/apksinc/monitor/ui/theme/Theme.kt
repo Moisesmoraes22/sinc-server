@@ -1,7 +1,6 @@
 package com.apksinc.monitor.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -77,7 +76,9 @@ object ApkSincColors {
 
 @Composable
 fun ApkSincTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // O design v2 e deliberadamente escuro (nao adaptativo) - nao segue o
+    // tema claro/escuro do sistema, igual definido no mockup aprovado.
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColors else LightColors

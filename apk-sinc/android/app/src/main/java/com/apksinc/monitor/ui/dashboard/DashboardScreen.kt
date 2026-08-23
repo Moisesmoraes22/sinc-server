@@ -65,6 +65,13 @@ fun DashboardScreen(onServerClick: (String) -> Unit) {
                             CircularProgressIndicator(color = colors.accent)
                         }
                     }
+                } else if (state.error != null) {
+                    item {
+                        com.apksinc.monitor.ui.components.ErrorState(
+                            message = state.error!!,
+                            onRetry = viewModel::refresh,
+                        )
+                    }
                 } else if (state.servers.isEmpty()) {
                     item {
                         EmptyState(
