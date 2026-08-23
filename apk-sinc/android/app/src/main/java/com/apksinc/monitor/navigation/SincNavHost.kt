@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.apksinc.monitor.R
+import com.apksinc.monitor.ui.about.AboutScreen
 import com.apksinc.monitor.ui.dashboard.DashboardScreen
 import com.apksinc.monitor.ui.details.ServerDetailsScreen
 import com.apksinc.monitor.ui.history.HistoryScreen
@@ -29,6 +30,7 @@ private object Routes {
     const val DASHBOARD = "dashboard"
     const val HISTORY = "history"
     const val SETTINGS = "settings"
+    const val ABOUT = "about"
     const val DETAILS = "details/{serverId}"
     fun details(serverId: String) = "details/$serverId"
 }
@@ -77,7 +79,10 @@ fun SincNavHost(startServerId: String? = null) {
                 DashboardScreen(onServerClick = { id -> navController.navigate(Routes.details(id)) })
             }
             composable(Routes.HISTORY) { HistoryScreen() }
-            composable(Routes.SETTINGS) { SettingsScreen() }
+            composable(Routes.SETTINGS) {
+                SettingsScreen(onAboutClick = { navController.navigate(Routes.ABOUT) })
+            }
+            composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.DETAILS) { backStackEntry ->
                 val serverId = backStackEntry.arguments?.getString("serverId") ?: return@composable
                 ServerDetailsScreen(serverId = serverId, onBack = { navController.popBackStack() })

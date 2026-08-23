@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -33,7 +36,7 @@ import com.apksinc.monitor.ui.components.SectionLabel
 import com.apksinc.monitor.ui.theme.ApkSincColors
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onAboutClick: () -> Unit = {}) {
     val viewModel: SettingsViewModel = viewModel(factory = ViewModelFactoryProvider.factory())
     val settings by viewModel.settings.collectAsState()
     val colors = ApkSincColors.colors
@@ -80,14 +83,23 @@ fun SettingsScreen() {
 
             item { SectionLabel("Sobre") }
             item {
-                SettingsCard {
-                    Text("APK SINC", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
-                    Text(
-                        "Versão ${BuildConfig.VERSION_NAME}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textMuted,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
+                SettingsCard(onClick = onAboutClick) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            Text("APK SINC", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
+                            Text(
+                                "Versão ${BuildConfig.VERSION_NAME}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textMuted,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.textMuted)
+                    }
                 }
             }
         }
@@ -95,11 +107,25 @@ fun SettingsScreen() {
 }
 
 @Composable
-private fun SettingsCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+private fun SettingsCard(
+    onClick: (() -> Unit)? = null,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    val clickModifier = if (onClick != null) {
+        Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick,
+        )
+    } else {
+        Modifier
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ApkSincColors.colors.card, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(ApkSincColors.colors.card)
+            .then(clickModifier)
             .padding(16.dp),
         content = content,
     )

@@ -40,4 +40,9 @@
     <string name="settings_refresh_interval">Intervalo de atualizacao</string>
     <string name="settings_test_notification">Testar notificacao</string>
     <string name="settings_about">Sobre</string>
+
+    <string name="about_tagline">Monitoramento de Servidores</string>
+    <string name="about_author">by Moisés Moraes</string>
+    <string name="about_version">Versão %1$s</string>
+    <string name="about_description">Aplicativo de monitoramento de servidores e unidades de sincronização do Grupo Ômega.</string>
 </resources>
