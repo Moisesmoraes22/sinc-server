@@ -1,3 +1,11 @@
 # Copie este arquivo para local.properties (NAO commitar local.properties)
-# e ajuste o caminho para o seu Android SDK.
+# e ajuste os valores para o seu ambiente.
 sdk.dir=/caminho/para/Android/Sdk
+
+# Endereco do backend consumido pelo app. Emulador: http://10.0.2.2:PORTA/
+# Dispositivo fisico na mesma rede: http://IP_DO_PC:PORTA/
+API_BASE_URL=http://192.168.0.4:8001/
+
+# So necessaria se o backend tiver API_KEY definida no .env dele (backend
+# exposto fora da rede local). Deixe vazio para um backend local sem auth.
+API_KEY=
