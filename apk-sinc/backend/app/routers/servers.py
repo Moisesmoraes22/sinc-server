@@ -7,9 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.database.base import Repository
 from app.dependencies import get_repository
 from app.models.schemas import ServerListResponse, ServerOut
+from app.security import require_api_key
 from app.services.legacy_adapter import unit_to_server_out
 
-router = APIRouter(prefix="/api/servers", tags=["servers (legacy)"])
+router = APIRouter(
+    prefix="/api/servers",
+    tags=["servers (legacy)"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 @router.get("", response_model=ServerListResponse)

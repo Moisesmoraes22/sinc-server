@@ -6,9 +6,14 @@ from fastapi import APIRouter, Depends, Query
 from app.database.base import Repository
 from app.dependencies import get_repository
 from app.models.schemas import EventListResponse
+from app.security import require_api_key
 from app.services.legacy_adapter import event_to_event_out
 
-router = APIRouter(prefix="/api/events", tags=["events (legacy)"])
+router = APIRouter(
+    prefix="/api/events",
+    tags=["events (legacy)"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 @router.get("", response_model=EventListResponse)

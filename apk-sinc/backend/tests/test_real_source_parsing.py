@@ -1,103 +1,66 @@
-"""Testes do parser da fonte real, usando respostas simuladas (respx),
-ja que o ambiente de teste nao tem acesso de rede a fonte real (ver
-docs/architecture.md).
+"""Testes do parser da fonte real. A fonte e uma pagina GWT renderizada via
+Playwright (Chromium) - nao ha como mockar isso com respx/httpx, entao os
+testes exercitam diretamente a logica pura de parsing (`_parse_rows` e os
+helpers `_parse_int_brl`/`_parse_datetime_brl`), a partir de linhas de tabela
+como o `page.evaluate(_EXTRACT_TABLE_JS)` retornaria. `fetch_units()` (que
+depende de um browser real) e validado em producao, nao aqui.
 """
 
-import httpx
-import pytest
-import respx
+from datetime import timezone
 
-from app.monitor.real_source import RealSourceClient
+from app.monitor.real_source import RealSourceClient, _parse_datetime_brl, _parse_int_brl
 
-URL = "http://cli-1237.ddns.a7cloud.net.br:8080/online/monitorsincronizacao/"
+HEADER = ["Cod. A7", "Un. Negocio", "Revisoes a Enviar", "Ultimo Envio", "Tempo Desde Ultimo Envio", "Ultimo Recebimento", "Tempo Desde Ultimo Recebimento"]
 
 
-@pytest.mark.asyncio
-@respx.mock
-async def test_parses_json_list_format():
-    respx.get(URL).mock(
-        return_value=httpx.Response(
-            200,
-            json=[
-                {
-                    "a7_code": "A7-0001",
-                    "business_unit": "Unidade Matriz",
-                    "revisions_to_send": 3,
-                    "last_send_at": "2026-01-01T10:00:00Z",
-                    "last_receive_at": "2026-01-01T10:05:00Z",
-                },
-            ],
-            headers={"content-type": "application/json"},
-        )
-    )
-    client = RealSourceClient(url=URL)
-    readings = await client.fetch_units()
+def _client() -> RealSourceClient:
+    return RealSourceClient(url="http://fake-source.test/")
+
+
+def test_parse_int_brl_handles_thousands_separator():
+    assert _parse_int_brl("34.955") == 34955
+    assert _parse_int_brl("3") == 3
+    assert _parse_int_brl(None) is None
+    assert _parse_int_brl("") is None
+    assert _parse_int_brl("abc") is None
+
+
+def test_parse_datetime_brl_converts_from_sao_paulo_to_utc():
+    parsed = _parse_datetime_brl("01/01/2026 10:00:00")
+    assert parsed is not None
+    assert parsed.tzinfo == timezone.utc
+    # Sao Paulo (UTC-3, sem horario de verao em 2026) -> 13:00 UTC.
+    assert parsed.hour == 13
+
+    assert _parse_datetime_brl(None) is None
+    assert _parse_datetime_brl("nao e uma data") is None
+
+
+def test_parse_rows_extracts_readings_by_column_name():
+    rows = [
+        HEADER,
+        ["A7-0001", "Unidade Matriz", "34.955", "01/01/2026 10:00:00", "5 min", "01/01/2026 10:05:00", "2 min"],
+    ]
+    readings = _client()._parse_rows(rows)
 
     assert len(readings) == 1
     reading = readings[0]
     assert reading.a7_code == "A7-0001"
     assert reading.business_unit == "Unidade Matriz"
-    assert reading.revisions_to_send == 3
+    assert reading.revisions_to_send == 34955
     assert reading.last_send_at is not None
     assert reading.last_receive_at is not None
 
 
-@pytest.mark.asyncio
-@respx.mock
-async def test_parses_json_with_portuguese_field_names():
-    respx.get(URL).mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "data": [
-                    {
-                        "codigo_a7": "A7-0002",
-                        "unidade": "Filial Sul",
-                        "revisoes_a_enviar": 7,
-                        "ultimo_envio": "2026-01-01T09:00:00",
-                        "ultimo_recebimento": "2026-01-01T09:10:00",
-                    }
-                ]
-            },
-            headers={"content-type": "application/json"},
-        )
-    )
-    client = RealSourceClient(url=URL)
-    readings = await client.fetch_units()
-
-    assert len(readings) == 1
-    reading = readings[0]
-    assert reading.a7_code == "A7-0002"
-    assert reading.business_unit == "Filial Sul"
-    assert reading.revisions_to_send == 7
+def test_parse_rows_ignores_placeholder_and_incomplete_rows():
+    rows = [HEADER, ["Nao existem dados para serem exibidos"]]
+    assert _client()._parse_rows(rows) == []
 
 
-@pytest.mark.asyncio
-@respx.mock
-async def test_falls_back_to_html_table_parsing():
-    html = """
-    <html><body>
-    <table>
-      <tr><th>Codigo A7</th><th>Unidade</th><th>Ultimo Envio</th><th>Ultimo Recebimento</th></tr>
-      <tr><td>A7-0003</td><td>Filial Norte</td><td>01/01/2026 08:00</td><td>01/01/2026 08:05</td></tr>
-    </table>
-    </body></html>
-    """
-    respx.get(URL).mock(return_value=httpx.Response(200, text=html, headers={"content-type": "text/html"}))
-    client = RealSourceClient(url=URL)
-    readings = await client.fetch_units()
-
-    assert len(readings) == 1
-    reading = readings[0]
-    assert reading.a7_code == "A7-0003"
-    assert reading.business_unit == "Filial Norte"
-    assert reading.last_send_at is not None
+def test_parse_rows_returns_empty_when_no_rows():
+    assert _client()._parse_rows([]) == []
 
 
-@pytest.mark.asyncio
-@respx.mock
-async def test_http_error_propagates():
-    respx.get(URL).mock(return_value=httpx.Response(500))
-    client = RealSourceClient(url=URL)
-    with pytest.raises(httpx.HTTPStatusError):
-        await client.fetch_units()
+def test_parse_rows_returns_empty_when_a7_column_not_found():
+    rows = [["Foo", "Bar"], ["1", "2"]]
+    assert _client()._parse_rows(rows) == []

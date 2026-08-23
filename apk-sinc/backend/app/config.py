@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     default_critical_threshold_minutes: int = 15
     default_check_interval_seconds: int = 60
 
+    # Chave exigida no header X-API-Key. Vazia = autenticacao desligada
+    # (apenas para desenvolvimento local); em producao DEVE ser definida.
+    # Ver app/security.py.
+    api_key: str = ""
+
     firebase_credentials_path: str = "./firebase-adminsdk.json"
     fcm_topic: str = "sinc-alerts"
     fcm_dry_run: bool = True

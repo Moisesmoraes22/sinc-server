@@ -30,6 +30,8 @@ async def lifespan(app: FastAPI):
     yield
 
     await poller.stop()
+    if hasattr(source_client, "close"):
+        await source_client.close()
     app_state["repository"] = None
     app_state["poller"] = None
 

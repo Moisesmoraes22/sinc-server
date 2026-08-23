@@ -1,10 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import get_settings
 from app.models.schemas import MockScenarioRequest
 from app.monitor.factory import get_mock_client
+from app.security import require_api_key
 
-router = APIRouter(prefix="/api/mock", tags=["mock"])
+router = APIRouter(
+    prefix="/api/mock",
+    tags=["mock"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 @router.post("/scenario")

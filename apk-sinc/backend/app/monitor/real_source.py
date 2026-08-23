@@ -1,171 +1,202 @@
 """Cliente para a fonte real de monitoramento de sincronizacao.
 
-IMPORTANTE: este cliente NAO PUDE ser validado contra a URL real durante o
-desenvolvimento porque o ambiente de build nao tem rota de rede ate
-`cli-1237.ddns.a7cloud.net.br:8080` (ver docs/architecture.md, secao 1).
+O endpoint (".../monitorsincronizacao/") e uma aplicacao GWT (Google Web
+Toolkit) legada: a pagina inicial e HTML vazio e os dados reais so aparecem
+depois que o JavaScript da aplicacao roda e faz uma chamada RPC ao servidor
+num formato binario proprietario do GWT (nao e JSON nem uma tabela HTML
+estatica). Esse protocolo depende da ordem exata dos campos da classe DTO
+Java do servidor e nao e documentado nem estavel o suficiente para decodificar
+na mao com seguranca.
 
-O endpoint (".../monitorsincronizacao/") sugere fortemente um monitor de
-sincronizacao por unidade de negocio (codigo A7), com timestamps de ultimo
-envio/recebimento - e esse e o modelo de dominio adotado
-(app/models/domain.py: SyncUnitReading). O parser abaixo e tolerante a
-nomes de campo em portugues/ingles e a dois formatos plausiveis:
+Por isso este cliente usa Playwright (Chromium headless) para renderizar a
+pagina como um navegador de verdade faria, esperar a tabela carregar, e ler
+os dados diretamente do DOM ja processado pelo GWT. E mais pesado que uma
+chamada HTTP simples (~1-3s por consulta) mas e a forma robusta de extrair
+dados de uma pagina que so os expoe via JavaScript client-side.
 
-1. JSON estruturado (lista de unidades) - tentado primeiro.
-2. HTML com uma tabela - fallback via BeautifulSoup, tentando casar as
-   colunas do cabecalho com os campos esperados.
+Usamos a API SINCRONA do Playwright (nao a async_api) rodando dentro de
+`asyncio.to_thread`, em vez de manter um browser assincrono vivo no loop do
+FastAPI. Motivo: no Windows, o loop de eventos padrao do asyncio
+(SelectorEventLoop, que e o que o uvicorn usa) nao sabe criar subprocessos -
+e o Playwright async precisa disso para abrir o Chromium, o que gera
+`NotImplementedError`. A API sincrona do Playwright gerencia o subprocesso do
+Chromium na propria thread onde e chamada, sem depender do event loop do
+chamador, entao basta rodar essa thread fora do loop principal (via
+`asyncio.to_thread`) para nao bloquear as outras requisicoes do FastAPI
+enquanto a pagina carrega.
 
-Assim que o endpoint puder ser inspecionado de um ambiente com acesso
-(rode `python backend/scripts/inspect_source.py`), ajuste `_parse_json`
-e/ou `_parse_html` para o formato exato encontrado, mantendo a mesma
-assinatura publica `fetch_units()`.
+Tabela renderizada (inspecionada em produção, campos podem variar de ordem
+mas nao de nome - o parser abaixo casa por nome de coluna, nao por posicao):
+
+    Cod. A7 | Un. Negocio | Revisoes a Enviar | Ultimo Envio |
+    Tempo Desde Ultimo Envio | Ultimo Recebimento | Tempo Desde Ultimo Recebimento
+
+Os numeros de "Revisoes a Enviar" vem no formato brasileiro (ponto como
+separador de milhar, ex. "34.955"), tratado em `_parse_int_brl`.
 """
 
+import asyncio
 import logging
-import re
+import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
-import httpx
-from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
 from app.config import get_settings
 from app.models.domain import SyncUnitReading
 
 logger = logging.getLogger("sinc.real_source")
 
-A7_CODE_KEYS = ["a7_code", "codigo_a7", "codigoa7", "a7code", "codigo", "id"]
-BUSINESS_UNIT_KEYS = ["business_unit", "unidade", "unidade_negocio", "nome", "empresa", "filial"]
-REVISIONS_KEYS = ["revisions_to_send", "revisoes_a_enviar", "revisoes", "pendentes", "pending", "revisions"]
-LAST_SEND_KEYS = ["last_send_at", "ultimo_envio", "data_envio", "envio", "send_at", "last_send"]
-LAST_RECEIVE_KEYS = ["last_receive_at", "ultimo_recebimento", "data_recebimento", "recebimento", "receive_at", "last_receive"]
+# A pagina da A7Pharma exibe horarios no fuso local brasileiro, sem indicar o
+# offset. Interpretar esses horarios como UTC faz o backend achar que toda
+# unidade esta 3h atrasada e marcar tudo como CRITICO indevidamente.
+SOURCE_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
 
-def _get_first(item: dict, keys: list[str]):
-    lower_item = {str(k).strip().lower(): v for k, v in item.items()}
-    for key in keys:
-        if key in lower_item and lower_item[key] not in (None, ""):
-            return lower_item[key]
+def _parse_int_brl(value: str | None) -> int | None:
+    if not value:
+        return None
+    cleaned = value.strip().replace(".", "").replace(",", "")
+    if not cleaned or not cleaned.lstrip("-").isdigit():
+        return None
+    return int(cleaned)
+
+
+def _parse_datetime_brl(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+            return parsed.replace(tzinfo=SOURCE_TIMEZONE).astimezone(timezone.utc)
+        except ValueError:
+            continue
+    logger.debug("Nao foi possivel parsear data/hora da fonte real: %r", value)
     return None
 
 
-def _parse_datetime(value) -> datetime | None:
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        try:
-            return datetime.fromtimestamp(value, tz=timezone.utc)
-        except (ValueError, OSError):
-            return None
-    text = str(value).strip()
-    if not text:
-        return None
-    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M"):
-        try:
-            parsed = datetime.strptime(text, fmt)
-            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-    except ValueError:
-        logger.debug("Nao foi possivel parsear data/hora: %r", value)
-        return None
-
-
-def _slugify(name: str) -> str:
-    slug = re.sub(r"[^A-Za-z0-9]+", "-", name.strip().upper())
-    return slug.strip("-") or "UNIDADE"
+_EXTRACT_TABLE_JS = """() => {
+    const tables = Array.from(document.querySelectorAll('table'));
+    for (const table of tables) {
+        const rows = Array.from(table.rows).map(
+            tr => Array.from(tr.cells).map(cell => cell.innerText.trim())
+        );
+        const header = rows[0];
+        // A tabela de layout externa tambem "contem" o texto do cabecalho
+        // (tudo esta aninhado nela), mas como uma unica celula gigante com
+        // o texto da pagina inteira. A tabela de dados real tem poucas
+        // colunas curtas - e esse o criterio que as distingue.
+        const looksLikeHeaderRow = header
+            && header.length >= 4 && header.length <= 12
+            && header.every(c => c.length < 60)
+            && header.some(c => c.toLowerCase().includes('a7'));
+        if (looksLikeHeaderRow) {
+            return rows;
+        }
+    }
+    return [];
+}"""
 
 
 class RealSourceClient:
     def __init__(self, url: str | None = None, timeout: float | None = None):
         settings = get_settings()
         self.url = url or settings.source_url
-        self.timeout = timeout or settings.source_timeout_seconds
+        self.timeout_ms = int((timeout or settings.source_timeout_seconds) * 1000)
+
+    async def close(self) -> None:
+        """Nao ha estado persistente para liberar - cada fetch_units() abre e
+        fecha seu proprio Chromium na thread onde roda. Mantido por
+        compatibilidade com o shutdown hook em app/main.py."""
+        return None
 
     async def fetch_units(self) -> list[SyncUnitReading]:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(self.url)
-            response.raise_for_status()
+        rows = await asyncio.to_thread(self._fetch_rows_sync)
+        return self._parse_rows(rows)
 
-        try:
-            return self._parse_json(response.json())
-        except ValueError:
-            pass
+    def _fetch_rows_sync(self) -> list[list[str]]:
+        # O uvicorn forca SelectorEventLoopPolicy no processo inteiro no
+        # Windows (necessario para o proprio servidor HTTP), mas essa policy
+        # e global e o Playwright cria seu proprio event loop interno nesta
+        # thread separada. SelectorEventLoop nao sabe criar subprocessos
+        # (create_subprocess_exec -> NotImplementedError), entao reforcamos
+        # ProactorEventLoopPolicy aqui, escopado a esta thread de worker -
+        # ela nao tem loop rodando ainda e nao interfere no loop principal
+        # do FastAPI/uvicorn na thread do servidor.
+        if sys.platform == "win32":
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-        return self._parse_html(response.text)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page()
+                page.goto(self.url, timeout=self.timeout_ms, wait_until="networkidle")
+                page.wait_for_selector("table tr", timeout=self.timeout_ms)
+                # A pagina GWT aninha tabelas (uma de layout, outra de dados) -
+                # ver _EXTRACT_TABLE_JS para como distinguimos a certa.
+                return page.evaluate(_EXTRACT_TABLE_JS)
+            finally:
+                browser.close()
 
-    def _parse_json(self, payload) -> list[SyncUnitReading]:
-        now = datetime.now(timezone.utc)
-        items = payload if isinstance(payload, list) else payload.get("units") or payload.get("data") or payload.get("servers") or []
-        readings: list[SyncUnitReading] = []
-        for item in items:
-            business_unit = str(_get_first(item, BUSINESS_UNIT_KEYS) or "Unidade desconhecida")
-            a7_code = str(_get_first(item, A7_CODE_KEYS) or _slugify(business_unit))
-            revisions = _get_first(item, REVISIONS_KEYS)
-            readings.append(
-                SyncUnitReading(
-                    a7_code=a7_code,
-                    business_unit=business_unit,
-                    revisions_to_send=int(revisions) if revisions is not None else None,
-                    last_send_at=_parse_datetime(_get_first(item, LAST_SEND_KEYS)),
-                    last_receive_at=_parse_datetime(_get_first(item, LAST_RECEIVE_KEYS)),
-                    checked_at=now,
-                    raw=item if isinstance(item, dict) else {},
-                )
-            )
-        return readings
-
-    def _parse_html(self, html: str) -> list[SyncUnitReading]:
-        now = datetime.now(timezone.utc)
-        soup = BeautifulSoup(html, "html.parser")
-        readings: list[SyncUnitReading] = []
-
-        table = soup.find("table")
-        if table is None:
-            logger.warning(
-                "Nao foi possivel identificar uma tabela de unidades no HTML da fonte real; "
-                "ajuste RealSourceClient._parse_html apos inspecionar o endpoint real."
-            )
-            return readings
-
-        rows = table.find_all("tr")
+    def _parse_rows(self, rows: list[list[str]]) -> list[SyncUnitReading]:
         if not rows:
-            return readings
+            logger.warning("Fonte real nao retornou nenhuma linha de tabela apos renderizar a pagina.")
+            return []
 
-        header_cells = [c.get_text(strip=True).lower() for c in rows[0].find_all(["th", "td"])]
+        header = [cell.strip().lower() for cell in rows[0]]
 
-        def _col_index(keys: list[str]) -> int | None:
-            for idx, header in enumerate(header_cells):
-                if any(key in header for key in keys):
+        def find_column(*, must_have: list[str], must_not_have: list[str] = []) -> int | None:
+            for idx, cell in enumerate(header):
+                if all(token in cell for token in must_have) and not any(token in cell for token in must_not_have):
                     return idx
             return None
 
-        code_idx = _col_index(A7_CODE_KEYS) or 0
-        unit_idx = _col_index(BUSINESS_UNIT_KEYS)
-        send_idx = _col_index(LAST_SEND_KEYS)
-        receive_idx = _col_index(LAST_RECEIVE_KEYS)
-        revisions_idx = _col_index(REVISIONS_KEYS)
+        # Nota: usar `is None`, nao `or`, para escolher entre a tentativa
+        # principal e o fallback - o indice 0 e um valor valido mas "falsy"
+        # em Python, e `0 or fallback` avaliaria incorretamente o fallback.
+        code_idx = find_column(must_have=["a7"])
+        if code_idx is None:
+            code_idx = find_column(must_have=["cod"])
 
+        unit_idx = find_column(must_have=["negóc"])
+        if unit_idx is None:
+            unit_idx = find_column(must_have=["negoc"])
+
+        revisions_idx = find_column(must_have=["revis"])
+        last_send_idx = find_column(must_have=["envio"], must_not_have=["tempo", "desde"])
+        last_receive_idx = find_column(must_have=["recebimento"], must_not_have=["tempo", "desde"])
+
+        if code_idx is None:
+            logger.warning("Nao foi possivel identificar a coluna de codigo A7 no header: %r", header)
+            return []
+
+        now = datetime.now(timezone.utc)
+        readings: list[SyncUnitReading] = []
         for row in rows[1:]:
-            cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
-            if not cells or len(cells) <= code_idx:
+            if code_idx >= len(row) or not row[code_idx]:
                 continue
-            a7_code = cells[code_idx]
-            if not a7_code:
+            # A tabela usa uma linha de placeholder com uma unica celula em
+            # colspan ("Nao existem dados para serem exibidos") quando esta
+            # vazia; sem esse filtro ela viraria uma "unidade" fantasma.
+            if len(row) < 3:
                 continue
-            business_unit = cells[unit_idx] if unit_idx is not None and unit_idx < len(cells) else a7_code
-            revisions = cells[revisions_idx] if revisions_idx is not None and revisions_idx < len(cells) else None
-            last_send = cells[send_idx] if send_idx is not None and send_idx < len(cells) else None
-            last_receive = cells[receive_idx] if receive_idx is not None and receive_idx < len(cells) else None
+            a7_code = row[code_idx]
+            business_unit = row[unit_idx] if unit_idx is not None and unit_idx < len(row) else a7_code
+            revisions = row[revisions_idx] if revisions_idx is not None and revisions_idx < len(row) else None
+            last_send = row[last_send_idx] if last_send_idx is not None and last_send_idx < len(row) else None
+            last_receive = row[last_receive_idx] if last_receive_idx is not None and last_receive_idx < len(row) else None
 
             readings.append(
                 SyncUnitReading(
                     a7_code=a7_code,
                     business_unit=business_unit,
-                    revisions_to_send=int(revisions) if revisions and revisions.isdigit() else None,
-                    last_send_at=_parse_datetime(last_send),
-                    last_receive_at=_parse_datetime(last_receive),
+                    revisions_to_send=_parse_int_brl(revisions),
+                    last_send_at=_parse_datetime_brl(last_send),
+                    last_receive_at=_parse_datetime_brl(last_receive),
                     checked_at=now,
                 )
             )

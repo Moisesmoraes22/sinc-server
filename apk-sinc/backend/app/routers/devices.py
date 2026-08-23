@@ -3,8 +3,13 @@ from fastapi import APIRouter, Depends
 from app.database.base import Repository
 from app.dependencies import get_repository
 from app.models.schemas import DeviceListResponse, DeviceOut, DeviceRegisterRequest
+from app.security import require_api_key
 
-router = APIRouter(prefix="/api/devices", tags=["devices"])
+router = APIRouter(
+    prefix="/api/devices",
+    tags=["devices"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 @router.post("")

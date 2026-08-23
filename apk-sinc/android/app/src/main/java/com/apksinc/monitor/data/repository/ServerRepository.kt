@@ -33,7 +33,7 @@ class ServerRepository(
 
     suspend fun refreshServers() {
         val response = api.getServers()
-        dao.upsertServers(response.servers.map { it.toEntity() })
+        dao.replaceServers(response.servers.map { it.toEntity() })
     }
 
     suspend fun refreshEvents(limit: Int = 200) {
