@@ -2,9 +2,11 @@ package com.apksinc.monitor.ui.dashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,69 +14,69 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apksinc.monitor.R
 import com.apksinc.monitor.ui.ViewModelFactoryProvider
+import com.apksinc.monitor.ui.components.EmptyState
+import com.apksinc.monitor.ui.components.SectionLabel
 import com.apksinc.monitor.ui.components.ServerCard
+import com.apksinc.monitor.ui.theme.ApkSincColors
+import androidx.compose.material.icons.filled.Checklist
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(onServerClick: (String) -> Unit) {
     val viewModel: DashboardViewModel = viewModel(factory = ViewModelFactoryProvider.factory())
     val state by viewModel.uiState.collectAsState()
+    val colors = ApkSincColors.colors
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringRes(R.string.app_name), fontWeight = FontWeight.Bold)
-                        Text(
-                            stringRes(R.string.app_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Scaffold(containerColor = colors.background) { padding ->
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item { DashboardHeader(onRefresh = viewModel::refresh) }
+
+                if (!state.allOperational) {
+                    item { AlertBanner(offlineCount = state.offlineCount, attentionCount = state.attentionCount) }
+                }
+
+                item { StatRow(state) }
+
+                item { SectionLabel("Unidades — críticas primeiro") }
+
+                if (state.isLoading && state.servers.isEmpty()) {
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth().padding(32.dp), horizontalArrangement = Arrangement.Center) {
+                            CircularProgressIndicator(color = colors.accent)
+                        }
+                    }
+                } else if (state.servers.isEmpty()) {
+                    item {
+                        EmptyState(
+                            icon = Icons.Filled.Checklist,
+                            title = "Nenhuma unidade monitorada",
+                            message = "Assim que houver unidades sincronizando, elas aparecem aqui.",
                         )
                     }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null)
+                } else {
+                    items(state.servers, key = { it.id }) { server ->
+                        ServerCard(server = server, onClick = { onServerClick(server.id) })
                     }
-                },
-            )
-        },
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            OverallStatusBanner(hasOffline = state.hasOffline, hasAttention = state.attentionCount > 0)
-            SummaryRow(state)
-
-            if (state.isLoading && state.servers.isEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(32.dp),
-                    horizontalArrangement = Arrangement.Center,
-                ) { CircularProgressIndicator() }
-            }
-
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(state.servers, key = { it.id }) { server ->
-                    ServerCard(server = server, onClick = { onServerClick(server.id) })
                 }
             }
         }
@@ -82,40 +84,84 @@ fun DashboardScreen(onServerClick: (String) -> Unit) {
 }
 
 @Composable
-private fun OverallStatusBanner(hasOffline: Boolean, hasAttention: Boolean) {
-    val (bg, text) = when {
-        hasOffline -> MaterialTheme.colorScheme.errorContainer to stringRes(R.string.status_some_offline)
-        hasAttention -> MaterialTheme.colorScheme.tertiaryContainer to stringRes(R.string.status_some_attention)
-        else -> MaterialTheme.colorScheme.primaryContainer to stringRes(R.string.status_all_operational)
+private fun DashboardHeader(onRefresh: () -> Unit) {
+    val colors = ApkSincColors.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column {
+            Text(
+                text = stringRes(R.string.app_name),
+                style = MaterialTheme.typography.headlineMedium,
+                color = colors.textPrimary,
+            )
+            Text(
+                text = stringRes(R.string.app_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        IconButton(
+            onClick = onRefresh,
+            modifier = Modifier.background(colors.elevated, RoundedCornerShape(10.dp)),
+        ) {
+            Icon(Icons.Filled.Refresh, contentDescription = "Atualizar", tint = colors.textSecondary)
+        }
+    }
+}
+
+@Composable
+private fun AlertBanner(offlineCount: Int, attentionCount: Int) {
+    val colors = ApkSincColors.colors
+    val message = when {
+        offlineCount > 0 -> "$offlineCount unidade${if (offlineCount > 1) "s" else ""} crítica${if (offlineCount > 1) "s" else ""} agora"
+        else -> "$attentionCount unidade${if (attentionCount > 1) "s" else ""} precisa${if (attentionCount == 1) "" else "m"} de atenção"
     }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .background(bg, RoundedCornerShape(16.dp))
-            .padding(16.dp),
+            .background(colors.dangerSoft.takeIf { offlineCount > 0 } ?: colors.warningSoft, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Icon(
+            Icons.Filled.Warning,
+            contentDescription = null,
+            tint = if (offlineCount > 0) colors.danger else colors.warning,
+            modifier = Modifier.padding(end = 10.dp),
+        )
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
     }
 }
 
 @Composable
-private fun SummaryRow(state: DashboardUiState) {
+private fun StatRow(state: DashboardUiState) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SummaryStat(stringRes(R.string.status_online), state.onlineCount)
-        SummaryStat(stringRes(R.string.status_attention), state.attentionCount)
-        SummaryStat(stringRes(R.string.status_offline), state.offlineCount)
+        StatCard(state.onlineCount, "Normal", ApkSincColors.colors.success, Modifier.weight(1f))
+        StatCard(state.attentionCount, "Atenção", ApkSincColors.colors.warning, Modifier.weight(1f))
+        StatCard(state.offlineCount, "Crítico", ApkSincColors.colors.danger, Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun SummaryStat(label: String, count: Int) {
-    Column {
-        Text(count.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun StatCard(count: Int, label: String, dotColor: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    val colors = ApkSincColors.colors
+    Column(
+        modifier = modifier
+            .background(colors.elevated, RoundedCornerShape(12.dp))
+            .padding(12.dp),
+    ) {
+        Text(count.toString(), style = MaterialTheme.typography.headlineMedium, color = colors.textPrimary)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+            Box(modifier = Modifier.background(dotColor, RoundedCornerShape(50)).padding(3.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = colors.textMuted, modifier = Modifier.padding(start = 6.dp))
+        }
     }
 }
 
