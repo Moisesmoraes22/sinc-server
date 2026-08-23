@@ -6,6 +6,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    source_mode: str = "mock"  # "real" | "mock"
+    source_url: str = "http://cli-1237.ddns.a7cloud.net.br:8080/online/monitorsincronizacao/"
+    source_timeout_seconds: float = 10.0
+
+    poll_interval_seconds: int = 30
+    retry_attempts: int = 3
+    retry_backoff_seconds: float = 2.0
+
     # Backend de persistencia: "supabase" (producao) ou "sqlite" (dev local
     # sem depender de um projeto Supabase configurado; testes automatizados
     # sempre usam SqliteRepository diretamente, sem passar por este flag).
@@ -22,8 +30,15 @@ class Settings(BaseSettings):
     # sem Supabase configurado) ou em testes.
     sqlite_database_url: str = "sqlite:///./sinc.db"
 
+    # Valores de fallback para monitor_settings caso a tabela ainda nao
+    # tenha sido semeada (ver migrations/004_seed_settings.sql). A fonte da
+    # verdade em producao e sempre a tabela `monitor_settings` no Supabase.
+    default_warning_threshold_minutes: int = 5
+    default_critical_threshold_minutes: int = 15
+    default_check_interval_seconds: int = 60
+
     firebase_credentials_path: str = "./firebase-adminsdk.json"
-    fcm_topic: str = "omg-sinc-lembretes"
+    fcm_topic: str = "sinc-alerts"
     fcm_dry_run: bool = True
 
     api_host: str = "0.0.0.0"

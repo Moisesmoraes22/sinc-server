@@ -6,6 +6,7 @@ import os
 os.environ.setdefault("DB_BACKEND", "sqlite")
 os.environ.setdefault("SQLITE_DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("FCM_DRY_RUN", "true")
+os.environ.setdefault("SOURCE_MODE", "mock")
 
 import pytest
 

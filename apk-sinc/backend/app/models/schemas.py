@@ -1,110 +1,57 @@
-from datetime import date, datetime
+from datetime import datetime
 
 from pydantic import BaseModel
 
 
 # ---------------------------------------------------------------------
-# Perfil
+# Dominio novo: unidades de sincronizacao (sync_units / sync_events)
 # ---------------------------------------------------------------------
-class ProfileOut(BaseModel):
+class SyncUnitOut(BaseModel):
     id: str | None
-    display_name: str
+    a7_code: str
+    business_unit: str
+    revisions_to_send: int | None
+    last_send_at: datetime | None
+    last_receive_at: datetime | None
+    send_elapsed_minutes: float | None
+    receive_elapsed_minutes: float | None
+    send_status: str
+    receive_status: str
+    overall_status: str
+    consecutive_failures: int
+    last_checked_at: datetime | None
 
     model_config = {"from_attributes": True}
 
 
-class ProfileUpdateRequest(BaseModel):
-    display_name: str
-
-
-# ---------------------------------------------------------------------
-# Habitos
-# ---------------------------------------------------------------------
-class HabitOut(BaseModel):
-    id: str | None
-    title: str
-    category: str
-    icon_key: str
-    target_value: float | None
-    target_unit: str | None
-    color_tag: str
-    today_value: float | None = None
-    today_completed: bool = False
-
-
-class HabitListResponse(BaseModel):
+class SyncUnitListResponse(BaseModel):
     status: str = "ok"
-    habits: list[HabitOut]
+    units: list[SyncUnitOut]
 
 
-class HabitLogRequest(BaseModel):
-    value: float | None = None
-    completed: bool = True
-
-
-class HabitLogOut(BaseModel):
+class SyncEventOut(BaseModel):
     id: int | None
-    habit_id: str
-    log_date: date
-    value: float | None
-    completed: bool
-    logged_at: datetime | None
+    unit_id: str | None
+    a7_code: str
+    business_unit: str
+    event_type: str
+    direction: str
+    previous_status: str | None
+    new_status: str
+    started_at: datetime | None
+    resolved_at: datetime | None
+    duration_seconds: int | None
+    message: str | None
+    created_at: datetime | None
 
     model_config = {"from_attributes": True}
 
 
-class HabitLogListResponse(BaseModel):
+class SyncEventListResponse(BaseModel):
     status: str = "ok"
-    logs: list[HabitLogOut]
+    events: list[SyncEventOut]
 
 
-# ---------------------------------------------------------------------
-# Metricas de saude/bem-estar
-# ---------------------------------------------------------------------
-class MetricOut(BaseModel):
-    id: int | None
-    metric_type: str
-    value: float
-    recorded_at: datetime | None
-
-    model_config = {"from_attributes": True}
-
-
-class MetricListResponse(BaseModel):
-    status: str = "ok"
-    metrics: list[MetricOut]
-
-
-class MetricCreateRequest(BaseModel):
-    metric_type: str
-    value: float
-
-
-# ---------------------------------------------------------------------
-# Home - resumo pessoal (agrega habitos + metricas + progresso semanal)
-# ---------------------------------------------------------------------
-class HomeMetricSnapshot(BaseModel):
-    metric_type: str
-    value: float | None
-    recorded_at: datetime | None
-
-
-class HomeSummaryResponse(BaseModel):
-    status: str = "ok"
-    greeting_name: str
-    weekly_progress_pct: float
-    weekly_progress_delta_pct: float
-    habits_done_today: int
-    habits_total_today: int
-    next_action_habit_id: str | None
-    next_action_message: str
-    metrics: list[HomeMetricSnapshot]
-    habits: list[HabitOut]
-
-
-# ---------------------------------------------------------------------
-# Dispositivos (push)
-# ---------------------------------------------------------------------
 class DeviceOut(BaseModel):
     id: str | None
     device_name: str | None
@@ -122,14 +69,69 @@ class DeviceListResponse(BaseModel):
     devices: list[DeviceOut]
 
 
-class DeviceRegisterRequest(BaseModel):
-    token: str
-    platform: str = "android"
+class MonitorSettingsOut(BaseModel):
+    warning_threshold_minutes: int
+    critical_threshold_minutes: int
+    check_interval_seconds: int
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------
+# Compatibilidade com o app Android existente (dominio "servers")
+# GET /api/servers e GET /api/events continuam com este formato - o
+# aplicativo Android nao precisa de nenhuma alteracao.
+# ---------------------------------------------------------------------
+class ServerOut(BaseModel):
+    id: str
+    name: str
+    status: str
+    response_time_ms: int | None
+    last_check: datetime | None
+    last_down_at: datetime | None
+    last_up_at: datetime | None
+    down_count: int
+
+
+class ServerListResponse(BaseModel):
+    status: str = "ok"
+    servers: list[ServerOut]
+
+
+class EventOut(BaseModel):
+    id: int
+    server_id: str
+    server_name: str
+    from_status: str
+    to_status: str
+    occurred_at: datetime
+    reason: str | None
+    response_time_ms: int | None
+
+
+class EventListResponse(BaseModel):
+    status: str = "ok"
+    events: list[EventOut]
 
 
 class HealthResponse(BaseModel):
     status: str
     database: str
+    monitor: str
     firebase: str
+    source_mode: str
     db_backend: str
-    habits_count: int
+    last_poll_at: datetime | None
+    units_count: int
+
+
+class DeviceRegisterRequest(BaseModel):
+    token: str
+    platform: str = "android"
+
+
+class MockScenarioRequest(BaseModel):
+    """Permite forcar um cenario de teste no MockSourceClient em runtime."""
+
+    a7_code: str
+    sequence: list[str]  # ex: ["NORMAL", "ATENCAO", "CRITICO", "CRITICO", "NORMAL"]

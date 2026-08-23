@@ -6,59 +6,50 @@ espelha exatamente as tabelas Supabase (app/models/orm.py) para que o
 comportamento observado nos testes seja o mesmo que em producao.
 """
 
-from datetime import date, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 
 from app.database.db import make_sessionmaker
-from app.models.domain import Device, Habit, HabitLog, Metric, Profile
-from app.models.orm import DeviceORM, HabitLogORM, HabitORM, MetricORM, ProfileORM
+from app.models.domain import Device, MonitorSettings, SyncEvent, SyncUnit
+from app.models.orm import DeviceORM, MonitorSettingsORM, SyncEventORM, SyncUnitORM
 
 
-def _profile_from_orm(row: ProfileORM) -> Profile:
-    return Profile(
+def _unit_from_orm(row: SyncUnitORM) -> SyncUnit:
+    return SyncUnit(
         id=row.id,
-        display_name=row.display_name,
+        a7_code=row.a7_code,
+        business_unit=row.business_unit,
+        revisions_to_send=row.revisions_to_send,
+        last_send_at=row.last_send_at,
+        last_receive_at=row.last_receive_at,
+        send_elapsed_minutes=row.send_elapsed_minutes,
+        receive_elapsed_minutes=row.receive_elapsed_minutes,
+        send_status=row.send_status,
+        receive_status=row.receive_status,
+        overall_status=row.overall_status,
+        consecutive_failures=row.consecutive_failures,
+        last_checked_at=row.last_checked_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
 
 
-def _habit_from_orm(row: HabitORM) -> Habit:
-    return Habit(
+def _event_from_orm(row: SyncEventORM) -> SyncEvent:
+    return SyncEvent(
         id=row.id,
-        profile_id=row.profile_id,
-        title=row.title,
-        category=row.category,
-        icon_key=row.icon_key,
-        target_value=row.target_value,
-        target_unit=row.target_unit,
-        color_tag=row.color_tag,
-        active=row.active,
-        sort_order=row.sort_order,
+        unit_id=row.unit_id,
+        a7_code=row.a7_code,
+        business_unit=row.business_unit,
+        event_type=row.event_type,
+        direction=row.direction,
+        previous_status=row.previous_status,
+        new_status=row.new_status,
+        started_at=row.started_at,
+        resolved_at=row.resolved_at,
+        duration_seconds=row.duration_seconds,
+        message=row.message,
         created_at=row.created_at,
-        updated_at=row.updated_at,
-    )
-
-
-def _habit_log_from_orm(row: HabitLogORM) -> HabitLog:
-    return HabitLog(
-        id=row.id,
-        habit_id=row.habit_id,
-        log_date=row.log_date,
-        value=row.value,
-        completed=row.completed,
-        logged_at=row.logged_at,
-    )
-
-
-def _metric_from_orm(row: MetricORM) -> Metric:
-    return Metric(
-        id=row.id,
-        profile_id=row.profile_id,
-        metric_type=row.metric_type,
-        value=row.value,
-        recorded_at=row.recorded_at,
     )
 
 
@@ -78,136 +69,81 @@ class SqliteRepository:
     def __init__(self, database_url: str = "sqlite:///./sinc.db"):
         self._sessionmaker = make_sessionmaker(database_url)
 
-    def get_or_create_profile(self, display_name: str = "Voce") -> Profile:
+    def get_unit(self, a7_code: str) -> SyncUnit | None:
         with self._sessionmaker() as session:
-            row = session.scalar(select(ProfileORM).limit(1))
+            row = session.scalar(select(SyncUnitORM).where(SyncUnitORM.a7_code == a7_code))
+            return _unit_from_orm(row) if row else None
+
+    def list_units(self) -> list[SyncUnit]:
+        with self._sessionmaker() as session:
+            rows = session.scalars(select(SyncUnitORM).order_by(SyncUnitORM.business_unit))
+            return [_unit_from_orm(r) for r in rows]
+
+    def upsert_unit(self, unit: SyncUnit) -> SyncUnit:
+        with self._sessionmaker() as session:
+            row = session.scalar(select(SyncUnitORM).where(SyncUnitORM.a7_code == unit.a7_code))
             if row is None:
-                row = ProfileORM(display_name=display_name)
-                session.add(row)
-                session.commit()
-                session.refresh(row)
-            return _profile_from_orm(row)
-
-    def update_profile(self, display_name: str) -> Profile:
-        with self._sessionmaker() as session:
-            row = session.scalar(select(ProfileORM).limit(1))
-            if row is None:
-                row = ProfileORM(display_name=display_name)
-                session.add(row)
-            else:
-                row.display_name = display_name
-                row.updated_at = datetime.utcnow()
-            session.commit()
-            session.refresh(row)
-            return _profile_from_orm(row)
-
-    def list_habits(self, profile_id: str, active_only: bool = True) -> list[Habit]:
-        with self._sessionmaker() as session:
-            stmt = select(HabitORM).where(HabitORM.profile_id == profile_id).order_by(HabitORM.sort_order)
-            if active_only:
-                stmt = stmt.where(HabitORM.active.is_(True))
-            rows = session.scalars(stmt)
-            return [_habit_from_orm(r) for r in rows]
-
-    def get_habit(self, habit_id: str) -> Habit | None:
-        with self._sessionmaker() as session:
-            row = session.get(HabitORM, habit_id)
-            return _habit_from_orm(row) if row else None
-
-    def upsert_habit(self, habit: Habit) -> Habit:
-        with self._sessionmaker() as session:
-            row = session.get(HabitORM, habit.id) if habit.id else None
-            if row is None:
-                row = HabitORM(profile_id=habit.profile_id)
+                row = SyncUnitORM(a7_code=unit.a7_code)
                 session.add(row)
 
-            row.title = habit.title
-            row.category = habit.category
-            row.icon_key = habit.icon_key
-            row.target_value = habit.target_value
-            row.target_unit = habit.target_unit
-            row.color_tag = habit.color_tag
-            row.active = habit.active
-            row.sort_order = habit.sort_order
+            row.business_unit = unit.business_unit
+            row.revisions_to_send = unit.revisions_to_send
+            row.last_send_at = unit.last_send_at
+            row.last_receive_at = unit.last_receive_at
+            row.send_elapsed_minutes = unit.send_elapsed_minutes
+            row.receive_elapsed_minutes = unit.receive_elapsed_minutes
+            row.send_status = unit.send_status
+            row.receive_status = unit.receive_status
+            row.overall_status = unit.overall_status
+            row.consecutive_failures = unit.consecutive_failures
+            row.last_checked_at = unit.last_checked_at
             row.updated_at = datetime.utcnow()
 
             session.commit()
             session.refresh(row)
-            return _habit_from_orm(row)
+            return _unit_from_orm(row)
 
-    def log_habit(self, habit_id: str, log_date: date, value: float | None, completed: bool) -> HabitLog:
+    def add_event(self, event: SyncEvent) -> SyncEvent:
         with self._sessionmaker() as session:
-            row = session.scalar(
-                select(HabitLogORM).where(HabitLogORM.habit_id == habit_id, HabitLogORM.log_date == log_date)
-            )
-            if row is None:
-                row = HabitLogORM(habit_id=habit_id, log_date=log_date)
-                session.add(row)
-            row.value = value
-            row.completed = completed
-            row.logged_at = datetime.utcnow()
-            session.commit()
-            session.refresh(row)
-            return _habit_log_from_orm(row)
-
-    def get_habit_log(self, habit_id: str, log_date: date) -> HabitLog | None:
-        with self._sessionmaker() as session:
-            row = session.scalar(
-                select(HabitLogORM).where(HabitLogORM.habit_id == habit_id, HabitLogORM.log_date == log_date)
-            )
-            return _habit_log_from_orm(row) if row else None
-
-    def list_habit_logs(
-        self, habit_id: str | None = None, since: date | None = None, limit: int = 200
-    ) -> list[HabitLog]:
-        with self._sessionmaker() as session:
-            stmt = select(HabitLogORM).order_by(HabitLogORM.log_date.desc()).limit(limit)
-            if habit_id:
-                stmt = stmt.where(HabitLogORM.habit_id == habit_id)
-            if since:
-                stmt = stmt.where(HabitLogORM.log_date >= since)
-            rows = session.scalars(stmt)
-            return [_habit_log_from_orm(r) for r in rows]
-
-    def add_metric(self, metric: Metric) -> Metric:
-        with self._sessionmaker() as session:
-            row = MetricORM(
-                profile_id=metric.profile_id,
-                metric_type=metric.metric_type,
-                value=metric.value,
-                recorded_at=metric.recorded_at or datetime.utcnow(),
+            row = SyncEventORM(
+                unit_id=event.unit_id,
+                a7_code=event.a7_code,
+                business_unit=event.business_unit,
+                event_type=event.event_type,
+                direction=event.direction,
+                previous_status=event.previous_status,
+                new_status=event.new_status,
+                started_at=event.started_at,
+                resolved_at=event.resolved_at,
+                duration_seconds=event.duration_seconds,
+                message=event.message,
             )
             session.add(row)
             session.commit()
             session.refresh(row)
-            return _metric_from_orm(row)
+            return _event_from_orm(row)
 
-    def list_metrics(
-        self, profile_id: str, metric_type: str | None = None, since: date | None = None, limit: int = 100
-    ) -> list[Metric]:
+    def list_events(
+        self, unit_a7_code: str | None = None, status: str | None = None, limit: int = 200
+    ) -> list[SyncEvent]:
         with self._sessionmaker() as session:
-            stmt = (
-                select(MetricORM)
-                .where(MetricORM.profile_id == profile_id)
-                .order_by(MetricORM.recorded_at.desc())
-                .limit(limit)
-            )
-            if metric_type:
-                stmt = stmt.where(MetricORM.metric_type == metric_type)
-            if since:
-                stmt = stmt.where(MetricORM.recorded_at >= since)
+            stmt = select(SyncEventORM).order_by(SyncEventORM.created_at.desc()).limit(limit)
+            if unit_a7_code:
+                stmt = stmt.where(SyncEventORM.a7_code == unit_a7_code)
+            if status:
+                stmt = stmt.where(SyncEventORM.new_status == status)
             rows = session.scalars(stmt)
-            return [_metric_from_orm(r) for r in rows]
+            return [_event_from_orm(r) for r in rows]
 
-    def latest_metric(self, profile_id: str, metric_type: str) -> Metric | None:
+    def get_last_event_for_unit(self, a7_code: str) -> SyncEvent | None:
         with self._sessionmaker() as session:
             row = session.scalar(
-                select(MetricORM)
-                .where(MetricORM.profile_id == profile_id, MetricORM.metric_type == metric_type)
-                .order_by(MetricORM.recorded_at.desc())
+                select(SyncEventORM)
+                .where(SyncEventORM.a7_code == a7_code)
+                .order_by(SyncEventORM.created_at.desc())
                 .limit(1)
             )
-            return _metric_from_orm(row) if row else None
+            return _event_from_orm(row) if row else None
 
     def register_device(self, fcm_token: str, device_name: str | None = None) -> Device:
         with self._sessionmaker() as session:
@@ -234,6 +170,33 @@ class SqliteRepository:
         with self._sessionmaker() as session:
             rows = session.scalars(select(DeviceORM.fcm_token).where(DeviceORM.active.is_(True)))
             return list(rows)
+
+    def get_settings(self) -> MonitorSettings:
+        with self._sessionmaker() as session:
+            row = session.get(MonitorSettingsORM, 1)
+            if row is None:
+                row = MonitorSettingsORM(id=1)
+                session.add(row)
+                session.commit()
+                session.refresh(row)
+            return MonitorSettings(
+                warning_threshold_minutes=row.warning_threshold_minutes,
+                critical_threshold_minutes=row.critical_threshold_minutes,
+                check_interval_seconds=row.check_interval_seconds,
+            )
+
+    def update_settings(self, settings: MonitorSettings) -> MonitorSettings:
+        with self._sessionmaker() as session:
+            row = session.get(MonitorSettingsORM, 1)
+            if row is None:
+                row = MonitorSettingsORM(id=1)
+                session.add(row)
+            row.warning_threshold_minutes = settings.warning_threshold_minutes
+            row.critical_threshold_minutes = settings.critical_threshold_minutes
+            row.check_interval_seconds = settings.check_interval_seconds
+            session.commit()
+            session.refresh(row)
+            return settings
 
     def health_check(self) -> bool:
         try:

@@ -1,97 +1,66 @@
-from datetime import date, timedelta
+from datetime import datetime, timezone
 
-from app.models.domain import CATEGORY_AGUA, COLOR_ACCENT, METRIC_MOOD_SCORE, Habit, Metric
-
-
-def test_get_or_create_profile_is_idempotent(repository):
-    first = repository.get_or_create_profile("Ana")
-    second = repository.get_or_create_profile("outro nome ignorado")
-    assert first.id == second.id
-    assert second.display_name == "Ana"
+from app.models.domain import CRITICO, NORMAL, MonitorSettings, SyncEvent, SyncUnit
 
 
-def test_update_profile(repository):
-    repository.get_or_create_profile("Ana")
-    updated = repository.update_profile("Ana Paula")
-    assert updated.display_name == "Ana Paula"
-
-
-def test_upsert_habit_creates_and_updates(repository):
-    profile = repository.get_or_create_profile("Ana")
-    habit = Habit(
-        profile_id=profile.id,
-        title="Beber agua",
-        category=CATEGORY_AGUA,
-        target_value=2.5,
-        target_unit="L",
-        color_tag=COLOR_ACCENT,
-    )
-    saved = repository.upsert_habit(habit)
+def test_upsert_unit_creates_and_updates(repository):
+    unit = SyncUnit(a7_code="A7-1", business_unit="Unidade Teste", overall_status=NORMAL)
+    saved = repository.upsert_unit(unit)
     assert saved.id is not None
-    assert saved.title == "Beber agua"
+    assert saved.a7_code == "A7-1"
 
-    saved.title = "Beber mais agua"
-    updated = repository.upsert_habit(saved)
-    assert updated.title == "Beber mais agua"
+    saved.overall_status = CRITICO
+    updated = repository.upsert_unit(saved)
+    assert updated.overall_status == CRITICO
     assert updated.id == saved.id
 
-
-def test_list_habits_orders_and_filters_active(repository):
-    profile = repository.get_or_create_profile("Ana")
-    h1 = repository.upsert_habit(Habit(profile_id=profile.id, title="B", category=CATEGORY_AGUA, sort_order=1))
-    repository.upsert_habit(Habit(profile_id=profile.id, title="A", category=CATEGORY_AGUA, sort_order=0))
-    inactive = repository.upsert_habit(Habit(profile_id=profile.id, title="C", category=CATEGORY_AGUA, sort_order=2, active=False))
-
-    habits = repository.list_habits(profile.id)
-    assert [h.title for h in habits] == ["A", "B"]
-    assert inactive.id not in [h.id for h in habits]
+    fetched = repository.get_unit("A7-1")
+    assert fetched.overall_status == CRITICO
 
 
-def test_log_habit_is_idempotent_per_day(repository):
-    profile = repository.get_or_create_profile("Ana")
-    habit = repository.upsert_habit(Habit(profile_id=profile.id, title="Beber agua", category=CATEGORY_AGUA))
-    today = date.today()
-
-    repository.log_habit(habit.id, today, value=1.0, completed=False)
-    log = repository.log_habit(habit.id, today, value=2.5, completed=True)
-
-    assert log.value == 2.5
-    assert log.completed is True
-
-    fetched = repository.get_habit_log(habit.id, today)
-    assert fetched.value == 2.5
-
-    all_logs = repository.list_habit_logs(habit_id=habit.id)
-    assert len(all_logs) == 1  # upsert por dia, nao duplica
+def test_get_unit_not_found_returns_none(repository):
+    assert repository.get_unit("nao-existe") is None
 
 
-def test_list_habit_logs_filters_since(repository):
-    profile = repository.get_or_create_profile("Ana")
-    habit = repository.upsert_habit(Habit(profile_id=profile.id, title="Beber agua", category=CATEGORY_AGUA))
-    today = date.today()
-    repository.log_habit(habit.id, today - timedelta(days=10), value=1.0, completed=True)
-    repository.log_habit(habit.id, today, value=1.0, completed=True)
-
-    recent = repository.list_habit_logs(habit_id=habit.id, since=today - timedelta(days=3))
-    assert len(recent) == 1
-    assert recent[0].log_date == today
+def test_list_units_orders_by_business_unit(repository):
+    repository.upsert_unit(SyncUnit(a7_code="A7-2", business_unit="Zebra"))
+    repository.upsert_unit(SyncUnit(a7_code="A7-1", business_unit="Alfa"))
+    units = repository.list_units()
+    assert [u.business_unit for u in units] == ["Alfa", "Zebra"]
 
 
-def test_add_and_list_metrics(repository):
-    profile = repository.get_or_create_profile("Ana")
-    repository.add_metric(Metric(profile_id=profile.id, metric_type=METRIC_MOOD_SCORE, value=8))
-    repository.add_metric(Metric(profile_id=profile.id, metric_type=METRIC_MOOD_SCORE, value=9))
+def test_add_and_list_events(repository):
+    unit = repository.upsert_unit(SyncUnit(a7_code="A7-1", business_unit="Unidade Teste"))
+    event = SyncEvent(
+        unit_id=unit.id,
+        a7_code="A7-1",
+        business_unit="Unidade Teste",
+        event_type="PROBLEM_STARTED",
+        direction="SEND",
+        previous_status=NORMAL,
+        new_status=CRITICO,
+        started_at=datetime.now(timezone.utc),
+    )
+    saved_event = repository.add_event(event)
+    assert saved_event.id is not None
 
-    metrics = repository.list_metrics(profile.id, metric_type=METRIC_MOOD_SCORE)
-    assert len(metrics) == 2
+    events = repository.list_events(unit_a7_code="A7-1")
+    assert len(events) == 1
+    assert events[0].new_status == CRITICO
 
-    latest = repository.latest_metric(profile.id, METRIC_MOOD_SCORE)
-    assert latest.value == 9
+    filtered = repository.list_events(status=NORMAL)
+    assert filtered == []
 
 
-def test_latest_metric_returns_none_when_missing(repository):
-    profile = repository.get_or_create_profile("Ana")
-    assert repository.latest_metric(profile.id, METRIC_MOOD_SCORE) is None
+def test_get_last_event_for_unit(repository):
+    unit = repository.upsert_unit(SyncUnit(a7_code="A7-1", business_unit="Unidade Teste"))
+    repository.add_event(
+        SyncEvent(unit_id=unit.id, a7_code="A7-1", business_unit="U", event_type="PROBLEM_STARTED", direction="SEND", new_status=CRITICO)
+    )
+    last = repository.get_last_event_for_unit("A7-1")
+    assert last is not None
+    assert last.new_status == CRITICO
+    assert repository.get_last_event_for_unit("nao-existe") is None
 
 
 def test_register_device_is_idempotent(repository):
@@ -106,6 +75,19 @@ def test_list_active_device_tokens(repository):
     repository.register_device("token-2")
     tokens = repository.list_active_device_tokens()
     assert set(tokens) == {"token-1", "token-2"}
+
+
+def test_settings_defaults_and_update(repository):
+    settings = repository.get_settings()
+    assert settings.warning_threshold_minutes == 5
+    assert settings.critical_threshold_minutes == 15
+    assert settings.check_interval_seconds == 60
+
+    repository.update_settings(MonitorSettings(warning_threshold_minutes=10, critical_threshold_minutes=30, check_interval_seconds=120))
+    updated = repository.get_settings()
+    assert updated.warning_threshold_minutes == 10
+    assert updated.critical_threshold_minutes == 30
+    assert updated.check_interval_seconds == 120
 
 
 def test_health_check_returns_true_when_reachable(repository):

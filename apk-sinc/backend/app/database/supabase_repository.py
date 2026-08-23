@@ -5,12 +5,12 @@ tabela/coluna correspondem exatamente ao schema criado pelas migrations em
 backend/supabase/migrations/.
 """
 
-from datetime import date, datetime
+from datetime import datetime
 
 from supabase import Client
 
 from app.database.supabase_client import get_supabase_client
-from app.models.domain import Device, Habit, HabitLog, Metric, Profile
+from app.models.domain import Device, MonitorSettings, SyncEvent, SyncUnit
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -23,50 +23,41 @@ def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
 
 
-def _profile_from_row(row: dict) -> Profile:
-    return Profile(
+def _unit_from_row(row: dict) -> SyncUnit:
+    return SyncUnit(
         id=row.get("id"),
-        display_name=row.get("display_name", "Voce"),
+        a7_code=row["a7_code"],
+        business_unit=row["business_unit"],
+        revisions_to_send=row.get("revisions_to_send"),
+        last_send_at=_parse_dt(row.get("last_send_at")),
+        last_receive_at=_parse_dt(row.get("last_receive_at")),
+        send_elapsed_minutes=row.get("send_elapsed_minutes"),
+        receive_elapsed_minutes=row.get("receive_elapsed_minutes"),
+        send_status=row.get("send_status", "NORMAL"),
+        receive_status=row.get("receive_status", "NORMAL"),
+        overall_status=row.get("overall_status", "NORMAL"),
+        consecutive_failures=row.get("consecutive_failures", 0),
+        last_checked_at=_parse_dt(row.get("last_checked_at")),
         created_at=_parse_dt(row.get("created_at")),
         updated_at=_parse_dt(row.get("updated_at")),
     )
 
 
-def _habit_from_row(row: dict) -> Habit:
-    return Habit(
+def _event_from_row(row: dict) -> SyncEvent:
+    return SyncEvent(
         id=row.get("id"),
-        profile_id=row["profile_id"],
-        title=row["title"],
-        category=row["category"],
-        icon_key=row.get("icon_key", "circle"),
-        target_value=row.get("target_value"),
-        target_unit=row.get("target_unit"),
-        color_tag=row.get("color_tag", "ACCENT"),
-        active=row.get("active", True),
-        sort_order=row.get("sort_order", 0),
+        unit_id=row.get("unit_id"),
+        a7_code=row["a7_code"],
+        business_unit=row["business_unit"],
+        event_type=row["event_type"],
+        direction=row["direction"],
+        previous_status=row.get("previous_status"),
+        new_status=row["new_status"],
+        started_at=_parse_dt(row.get("started_at")),
+        resolved_at=_parse_dt(row.get("resolved_at")),
+        duration_seconds=row.get("duration_seconds"),
+        message=row.get("message"),
         created_at=_parse_dt(row.get("created_at")),
-        updated_at=_parse_dt(row.get("updated_at")),
-    )
-
-
-def _habit_log_from_row(row: dict) -> HabitLog:
-    return HabitLog(
-        id=row.get("id"),
-        habit_id=row["habit_id"],
-        log_date=date.fromisoformat(row["log_date"]),
-        value=row.get("value"),
-        completed=row.get("completed", False),
-        logged_at=_parse_dt(row.get("logged_at")),
-    )
-
-
-def _metric_from_row(row: dict) -> Metric:
-    return Metric(
-        id=row.get("id"),
-        profile_id=row["profile_id"],
-        metric_type=row["metric_type"],
-        value=row["value"],
-        recorded_at=_parse_dt(row.get("recorded_at")),
     )
 
 
@@ -86,124 +77,70 @@ class SupabaseRepository:
     def __init__(self, client: Client | None = None):
         self._client = client or get_supabase_client()
 
-    def get_or_create_profile(self, display_name: str = "Voce") -> Profile:
-        result = self._client.table("profiles").select("*").limit(1).execute()
-        if result.data:
-            return _profile_from_row(result.data[0])
-        created = self._client.table("profiles").insert({"display_name": display_name}).execute()
-        return _profile_from_row(created.data[0])
+    def get_unit(self, a7_code: str) -> SyncUnit | None:
+        result = self._client.table("sync_units").select("*").eq("a7_code", a7_code).limit(1).execute()
+        return _unit_from_row(result.data[0]) if result.data else None
 
-    def update_profile(self, display_name: str) -> Profile:
-        profile = self.get_or_create_profile(display_name)
-        result = (
-            self._client.table("profiles")
-            .update({"display_name": display_name})
-            .eq("id", profile.id)
-            .execute()
-        )
-        return _profile_from_row(result.data[0])
+    def list_units(self) -> list[SyncUnit]:
+        result = self._client.table("sync_units").select("*").order("business_unit").execute()
+        return [_unit_from_row(r) for r in result.data]
 
-    def list_habits(self, profile_id: str, active_only: bool = True) -> list[Habit]:
-        query = self._client.table("habits").select("*").eq("profile_id", profile_id).order("sort_order")
-        if active_only:
-            query = query.eq("active", True)
+    def upsert_unit(self, unit: SyncUnit) -> SyncUnit:
+        payload = {
+            "a7_code": unit.a7_code,
+            "business_unit": unit.business_unit,
+            "revisions_to_send": unit.revisions_to_send,
+            "last_send_at": _iso(unit.last_send_at),
+            "last_receive_at": _iso(unit.last_receive_at),
+            "send_elapsed_minutes": unit.send_elapsed_minutes,
+            "receive_elapsed_minutes": unit.receive_elapsed_minutes,
+            "send_status": unit.send_status,
+            "receive_status": unit.receive_status,
+            "overall_status": unit.overall_status,
+            "consecutive_failures": unit.consecutive_failures,
+            "last_checked_at": _iso(unit.last_checked_at),
+        }
+        result = self._client.table("sync_units").upsert(payload, on_conflict="a7_code").execute()
+        return _unit_from_row(result.data[0])
+
+    def add_event(self, event: SyncEvent) -> SyncEvent:
+        payload = {
+            "unit_id": event.unit_id,
+            "a7_code": event.a7_code,
+            "business_unit": event.business_unit,
+            "event_type": event.event_type,
+            "direction": event.direction,
+            "previous_status": event.previous_status,
+            "new_status": event.new_status,
+            "started_at": _iso(event.started_at),
+            "resolved_at": _iso(event.resolved_at),
+            "duration_seconds": event.duration_seconds,
+            "message": event.message,
+        }
+        result = self._client.table("sync_events").insert(payload).execute()
+        return _event_from_row(result.data[0])
+
+    def list_events(
+        self, unit_a7_code: str | None = None, status: str | None = None, limit: int = 200
+    ) -> list[SyncEvent]:
+        query = self._client.table("sync_events").select("*").order("created_at", desc=True).limit(limit)
+        if unit_a7_code:
+            query = query.eq("a7_code", unit_a7_code)
+        if status:
+            query = query.eq("new_status", status)
         result = query.execute()
-        return [_habit_from_row(r) for r in result.data]
+        return [_event_from_row(r) for r in result.data]
 
-    def get_habit(self, habit_id: str) -> Habit | None:
-        result = self._client.table("habits").select("*").eq("id", habit_id).limit(1).execute()
-        return _habit_from_row(result.data[0]) if result.data else None
-
-    def upsert_habit(self, habit: Habit) -> Habit:
-        payload = {
-            "profile_id": habit.profile_id,
-            "title": habit.title,
-            "category": habit.category,
-            "icon_key": habit.icon_key,
-            "target_value": habit.target_value,
-            "target_unit": habit.target_unit,
-            "color_tag": habit.color_tag,
-            "active": habit.active,
-            "sort_order": habit.sort_order,
-        }
-        if habit.id:
-            payload["id"] = habit.id
-            result = self._client.table("habits").upsert(payload, on_conflict="id").execute()
-        else:
-            result = self._client.table("habits").insert(payload).execute()
-        return _habit_from_row(result.data[0])
-
-    def log_habit(self, habit_id: str, log_date: date, value: float | None, completed: bool) -> HabitLog:
-        payload = {
-            "habit_id": habit_id,
-            "log_date": log_date.isoformat(),
-            "value": value,
-            "completed": completed,
-            "logged_at": datetime.utcnow().isoformat(),
-        }
-        result = self._client.table("habit_logs").upsert(payload, on_conflict="habit_id,log_date").execute()
-        return _habit_log_from_row(result.data[0])
-
-    def get_habit_log(self, habit_id: str, log_date: date) -> HabitLog | None:
+    def get_last_event_for_unit(self, a7_code: str) -> SyncEvent | None:
         result = (
-            self._client.table("habit_logs")
+            self._client.table("sync_events")
             .select("*")
-            .eq("habit_id", habit_id)
-            .eq("log_date", log_date.isoformat())
+            .eq("a7_code", a7_code)
+            .order("created_at", desc=True)
             .limit(1)
             .execute()
         )
-        return _habit_log_from_row(result.data[0]) if result.data else None
-
-    def list_habit_logs(
-        self, habit_id: str | None = None, since: date | None = None, limit: int = 200
-    ) -> list[HabitLog]:
-        query = self._client.table("habit_logs").select("*").order("log_date", desc=True).limit(limit)
-        if habit_id:
-            query = query.eq("habit_id", habit_id)
-        if since:
-            query = query.gte("log_date", since.isoformat())
-        result = query.execute()
-        return [_habit_log_from_row(r) for r in result.data]
-
-    def add_metric(self, metric: Metric) -> Metric:
-        payload = {
-            "profile_id": metric.profile_id,
-            "metric_type": metric.metric_type,
-            "value": metric.value,
-            "recorded_at": _iso(metric.recorded_at) or datetime.utcnow().isoformat(),
-        }
-        result = self._client.table("metrics").insert(payload).execute()
-        return _metric_from_row(result.data[0])
-
-    def list_metrics(
-        self, profile_id: str, metric_type: str | None = None, since: date | None = None, limit: int = 100
-    ) -> list[Metric]:
-        query = (
-            self._client.table("metrics")
-            .select("*")
-            .eq("profile_id", profile_id)
-            .order("recorded_at", desc=True)
-            .limit(limit)
-        )
-        if metric_type:
-            query = query.eq("metric_type", metric_type)
-        if since:
-            query = query.gte("recorded_at", since.isoformat())
-        result = query.execute()
-        return [_metric_from_row(r) for r in result.data]
-
-    def latest_metric(self, profile_id: str, metric_type: str) -> Metric | None:
-        result = (
-            self._client.table("metrics")
-            .select("*")
-            .eq("profile_id", profile_id)
-            .eq("metric_type", metric_type)
-            .order("recorded_at", desc=True)
-            .limit(1)
-            .execute()
-        )
-        return _metric_from_row(result.data[0]) if result.data else None
+        return _event_from_row(result.data[0]) if result.data else None
 
     def register_device(self, fcm_token: str, device_name: str | None = None) -> Device:
         now = datetime.utcnow().isoformat()
@@ -219,9 +156,30 @@ class SupabaseRepository:
         result = self._client.table("devices").select("fcm_token").eq("active", True).execute()
         return [r["fcm_token"] for r in result.data]
 
+    def get_settings(self) -> MonitorSettings:
+        result = self._client.table("monitor_settings").select("*").eq("id", 1).limit(1).execute()
+        if not result.data:
+            return MonitorSettings()
+        row = result.data[0]
+        return MonitorSettings(
+            warning_threshold_minutes=row["warning_threshold_minutes"],
+            critical_threshold_minutes=row["critical_threshold_minutes"],
+            check_interval_seconds=row["check_interval_seconds"],
+        )
+
+    def update_settings(self, settings: MonitorSettings) -> MonitorSettings:
+        payload = {
+            "id": 1,
+            "warning_threshold_minutes": settings.warning_threshold_minutes,
+            "critical_threshold_minutes": settings.critical_threshold_minutes,
+            "check_interval_seconds": settings.check_interval_seconds,
+        }
+        self._client.table("monitor_settings").upsert(payload).execute()
+        return settings
+
     def health_check(self) -> bool:
         try:
-            self._client.table("profiles").select("id").limit(1).execute()
+            self._client.table("monitor_settings").select("id").limit(1).execute()
             return True
         except Exception:
             return False
