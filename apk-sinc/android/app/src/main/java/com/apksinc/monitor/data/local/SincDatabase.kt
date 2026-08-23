@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [ServerEntity::class, EventEntity::class], version = 1, exportSchema = false)
+@Database(entities = [ServerEntity::class, EventEntity::class], version = 3, exportSchema = false)
 abstract class SincDatabase : RoomDatabase() {
     abstract fun sincDao(): SincDao
 
@@ -18,7 +18,13 @@ abstract class SincDatabase : RoomDatabase() {
                     context.applicationContext,
                     SincDatabase::class.java,
                     "sinc.db",
-                ).build().also { instance = it }
+                )
+                    // Cache local descartavel (fonte da verdade e sempre a API) -
+                    // um reset limpo em qualquer mudanca de schema e preferivel a
+                    // manter migracoes para dados que sao so um cache de leitura.
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { instance = it }
             }
     }
 }
