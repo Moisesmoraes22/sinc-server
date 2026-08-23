@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [HabitEntity::class], version = 2, exportSchema = false)
+@Database(entities = [ServerEntity::class, EventEntity::class], version = 1, exportSchema = false)
 abstract class SincDatabase : RoomDatabase() {
     abstract fun sincDao(): SincDao
 
@@ -18,13 +18,7 @@ abstract class SincDatabase : RoomDatabase() {
                     context.applicationContext,
                     SincDatabase::class.java,
                     "sinc.db",
-                )
-                    // Cache local descartavel (fonte da verdade e sempre a API) -
-                    // um reset limpo no pivot de dominio e preferivel a manter
-                    // uma migracao complexa para tabelas que nao existem mais.
-                    .fallbackToDestructiveMigration()
-                    .build()
-                    .also { instance = it }
+                ).build().also { instance = it }
             }
     }
 }

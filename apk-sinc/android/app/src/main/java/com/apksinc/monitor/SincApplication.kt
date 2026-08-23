@@ -7,11 +7,11 @@ import android.os.Build
 import com.apksinc.monitor.data.local.SettingsDataStore
 import com.apksinc.monitor.data.local.SincDatabase
 import com.apksinc.monitor.data.remote.RetrofitFactory
-import com.apksinc.monitor.data.repository.HabitRepository
+import com.apksinc.monitor.data.repository.ServerRepository
 
 class SincApplication : Application() {
 
-    lateinit var repository: HabitRepository
+    lateinit var repository: ServerRepository
         private set
 
     lateinit var settingsDataStore: SettingsDataStore
@@ -23,7 +23,7 @@ class SincApplication : Application() {
 
         val database = SincDatabase.getInstance(this)
         val api = RetrofitFactory.create()
-        repository = HabitRepository(api, database.sincDao())
+        repository = ServerRepository(api, database.sincDao())
         settingsDataStore = SettingsDataStore(this)
     }
 

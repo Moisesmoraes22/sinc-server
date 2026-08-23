@@ -3,23 +3,34 @@ package com.apksinc.monitor.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.apksinc.monitor.data.local.SettingsDataStore
-import com.apksinc.monitor.data.repository.HabitRepository
-import com.apksinc.monitor.ui.habits.HabitsViewModel
-import com.apksinc.monitor.ui.health.HealthViewModel
-import com.apksinc.monitor.ui.home.HomeViewModel
-import com.apksinc.monitor.ui.profile.ProfileViewModel
+import com.apksinc.monitor.data.repository.ServerRepository
+import com.apksinc.monitor.ui.dashboard.DashboardViewModel
+import com.apksinc.monitor.ui.details.ServerDetailsViewModel
+import com.apksinc.monitor.ui.history.HistoryViewModel
+import com.apksinc.monitor.ui.settings.SettingsViewModel
 
 class SincViewModelFactory(
-    private val repository: HabitRepository,
+    private val repository: ServerRepository,
     private val settingsDataStore: SettingsDataStore,
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T = when (modelClass) {
-        HomeViewModel::class.java -> HomeViewModel(repository) as T
-        HabitsViewModel::class.java -> HabitsViewModel(repository) as T
-        HealthViewModel::class.java -> HealthViewModel(repository) as T
-        ProfileViewModel::class.java -> ProfileViewModel(repository, settingsDataStore) as T
+        DashboardViewModel::class.java -> DashboardViewModel(repository) as T
+        HistoryViewModel::class.java -> HistoryViewModel(repository) as T
+        SettingsViewModel::class.java -> SettingsViewModel(settingsDataStore) as T
         else -> throw IllegalArgumentException("ViewModel desconhecido: $modelClass")
+    }
+}
+
+class ServerDetailsViewModelFactory(
+    private val repository: ServerRepository,
+    private val serverId: String,
+) : ViewModelProvider.Factory {
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        require(modelClass == ServerDetailsViewModel::class.java)
+        return ServerDetailsViewModel(repository, serverId) as T
     }
 }
