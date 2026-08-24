@@ -1,6 +1,8 @@
 package com.apksinc.monitor.ui.details
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,7 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apksinc.monitor.domain.ServerStatus
 import com.apksinc.monitor.ui.ViewModelFactoryProvider
+import com.apksinc.monitor.ui.components.EmptyState
 import com.apksinc.monitor.ui.components.SectionLabel
 import com.apksinc.monitor.ui.components.StatusBadge
 import com.apksinc.monitor.ui.components.statusColorsFor
@@ -49,7 +53,7 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Voltar", tint = colors.textSecondary)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = colors.textSecondary)
                 }
             }
 
@@ -104,10 +108,10 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
 
                 if (state.events.isEmpty()) {
                     item {
-                        Text(
-                            "Nenhum evento registrado ainda.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textMuted,
+                        EmptyState(
+                            icon = Icons.Filled.History,
+                            title = "Nenhum evento registrado ainda",
+                            message = "Mudanças de status desta unidade vão aparecer aqui.",
                         )
                     }
                 } else {
@@ -148,6 +152,7 @@ private fun SyncDirectionCard(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.card, RoundedCornerShape(16.dp))
+            .border(BorderStroke(1.dp, colors.hairline), RoundedCornerShape(16.dp))
             .padding(16.dp),
     ) {
         Row(
