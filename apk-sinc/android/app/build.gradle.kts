@@ -109,6 +109,11 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Renderizacao do modelo 3D (rack de servidor) na tela de Status da
+    // API - versao confirmada pelo usuario em 24/08/2026 via GitHub
+    // releases (github.com/SceneView/sceneview-android/releases).
+    implementation("io.github.sceneview:sceneview:4.31.0")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
