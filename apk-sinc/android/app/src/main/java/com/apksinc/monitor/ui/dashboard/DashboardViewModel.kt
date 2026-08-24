@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.apksinc.monitor.data.repository.ServerRepository
 import com.apksinc.monitor.domain.ServerInfo
 import com.apksinc.monitor.domain.ServerStatus
+import com.apksinc.monitor.util.friendlyErrorMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,7 +45,7 @@ class DashboardViewModel(private val repository: ServerRepository) : ViewModel()
             loading.value = true
             error.value = null
             runCatching { repository.refreshServers() }
-                .onFailure { error.value = it.message ?: "Falha ao atualizar servidores" }
+                .onFailure { error.value = friendlyErrorMessage(it) }
             loading.value = false
         }
     }

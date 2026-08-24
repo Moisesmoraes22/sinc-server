@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,10 +59,8 @@ fun DashboardScreen(onServerClick: (String) -> Unit) {
                 item { SectionLabel("Unidades — críticas primeiro") }
 
                 if (state.isLoading && state.servers.isEmpty()) {
-                    item {
-                        Row(modifier = Modifier.fillMaxWidth().padding(32.dp), horizontalArrangement = Arrangement.Center) {
-                            CircularProgressIndicator(color = colors.accent)
-                        }
+                    items(4) {
+                        com.apksinc.monitor.ui.components.SkeletonServerCard()
                     }
                 } else if (state.error != null) {
                     item {
