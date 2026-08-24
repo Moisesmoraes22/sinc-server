@@ -25,6 +25,16 @@ fun formatTimeOnly(iso: String?): String {
     return timeFormatter.withZone(ZoneId.systemDefault()).format(instant)
 }
 
+/** Minutos decorridos em forma curta para destaque numérico (ex.: "41 min", "2h 5min"). */
+fun formatElapsedMinutesShort(minutes: Double?): String {
+    if (minutes == null || minutes < 0) return "--"
+    val totalMinutes = minutes.toLong()
+    if (totalMinutes < 60) return "$totalMinutes min"
+    val hours = totalMinutes / 60
+    val remainder = totalMinutes % 60
+    return if (remainder == 0L) "${hours}h" else "${hours}h ${remainder}min"
+}
+
 fun formatDuration(iso: String?): String {
     if (iso == null) return "--"
     val instant = parseIsoFlexible(iso) ?: return "--"

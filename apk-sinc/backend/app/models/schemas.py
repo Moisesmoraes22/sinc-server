@@ -91,6 +91,17 @@ class ServerOut(BaseModel):
     last_down_at: datetime | None
     last_up_at: datetime | None
     down_count: int
+    # Campos adicionais (aditivos, nao quebram o app antigo): detalham as
+    # duas direcoes de sincronizacao separadamente, para telas que queiram
+    # mostrar envio e recebimento como cartoes distintos.
+    send_status: str | None = None
+    receive_status: str | None = None
+    send_elapsed_minutes: float | None = None
+    receive_elapsed_minutes: float | None = None
+    last_send_at: datetime | None = None
+    last_receive_at: datetime | None = None
+    warning_threshold_minutes: int | None = None
+    critical_threshold_minutes: int | None = None
 
 
 class ServerListResponse(BaseModel):
@@ -107,6 +118,7 @@ class EventOut(BaseModel):
     occurred_at: datetime
     reason: str | None
     response_time_ms: int | None
+    duration_seconds: int | None = None
 
 
 class EventListResponse(BaseModel):

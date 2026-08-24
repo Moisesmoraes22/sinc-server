@@ -23,8 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apksinc.monitor.R
@@ -48,7 +50,7 @@ fun DashboardScreen(onServerClick: (String) -> Unit) {
                 contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 32.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                item { DashboardHeader(onRefresh = viewModel::refresh) }
+                item { DashboardHeader(isLoading = state.isLoading, onRefresh = viewModel::refresh) }
 
                 if (!state.allOperational) {
                     item { AlertBanner(offlineCount = state.offlineCount, attentionCount = state.attentionCount) }
@@ -88,8 +90,22 @@ fun DashboardScreen(onServerClick: (String) -> Unit) {
 }
 
 @Composable
-private fun DashboardHeader(onRefresh: () -> Unit) {
+private fun DashboardHeader(isLoading: Boolean, onRefresh: () -> Unit) {
     val colors = ApkSincColors.colors
+    val rotation = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(isLoading) {
+        if (isLoading) {
+            rotation.snapTo(0f)
+            rotation.animateTo(
+                targetValue = 360f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.LinearEasing),
+                ),
+            )
+        } else {
+            rotation.snapTo(0f)
+        }
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -110,9 +126,15 @@ private fun DashboardHeader(onRefresh: () -> Unit) {
         }
         IconButton(
             onClick = onRefresh,
+            enabled = !isLoading,
             modifier = Modifier.background(colors.elevated, RoundedCornerShape(10.dp)),
         ) {
-            Icon(Icons.Filled.Refresh, contentDescription = "Atualizar", tint = colors.textSecondary)
+            Icon(
+                Icons.Filled.Refresh,
+                contentDescription = "Atualizar",
+                tint = colors.textSecondary,
+                modifier = Modifier.graphicsLayer { rotationZ = rotation.value },
+            )
         }
     }
 }

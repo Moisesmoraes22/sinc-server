@@ -24,6 +24,14 @@ data class ServerInfo(
     val lastDownAt: String?,
     val lastUpAt: String?,
     val downCount: Int,
+    val sendStatus: ServerStatus?,
+    val receiveStatus: ServerStatus?,
+    val sendElapsedMinutes: Double?,
+    val receiveElapsedMinutes: Double?,
+    val lastSendAt: String?,
+    val lastReceiveAt: String?,
+    val warningThresholdMinutes: Int?,
+    val criticalThresholdMinutes: Int?,
 )
 
 data class ServerEvent(
@@ -35,4 +43,5 @@ data class ServerEvent(
     val occurredAt: String,
     val reason: String?,
     val responseTimeMs: Int?,
+    val durationSeconds: Int?,
 )

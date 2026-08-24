@@ -13,6 +13,14 @@ data class ServerEntity(
     val lastDownAt: String?,
     val lastUpAt: String?,
     val downCount: Int,
+    val sendStatus: String?,
+    val receiveStatus: String?,
+    val sendElapsedMinutes: Double?,
+    val receiveElapsedMinutes: Double?,
+    val lastSendAt: String?,
+    val lastReceiveAt: String?,
+    val warningThresholdMinutes: Int?,
+    val criticalThresholdMinutes: Int?,
 )
 
 @Entity(tableName = "events")
@@ -25,4 +33,5 @@ data class EventEntity(
     val occurredAt: String,
     val reason: String?,
     val responseTimeMs: Int?,
+    val durationSeconds: Int?,
 )

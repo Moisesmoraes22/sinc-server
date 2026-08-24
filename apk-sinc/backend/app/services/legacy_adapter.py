@@ -20,7 +20,12 @@ def status_to_legacy(status: str) -> str:
     return _STATUS_TO_LEGACY.get(status, status)
 
 
-def unit_to_server_out(unit: SyncUnit, repository: Repository | None = None) -> ServerOut:
+def unit_to_server_out(
+    unit: SyncUnit,
+    repository: Repository | None = None,
+    warning_threshold_minutes: int | None = None,
+    critical_threshold_minutes: int | None = None,
+) -> ServerOut:
     """Converte uma SyncUnit para o formato legado ServerOut.
 
     Se `repository` for informado, `last_down_at`/`last_up_at`/`down_count`
@@ -56,6 +61,14 @@ def unit_to_server_out(unit: SyncUnit, repository: Repository | None = None) -> 
         last_down_at=last_down_at,
         last_up_at=last_up_at,
         down_count=down_count,
+        send_status=status_to_legacy(unit.send_status),
+        receive_status=status_to_legacy(unit.receive_status),
+        send_elapsed_minutes=unit.send_elapsed_minutes,
+        receive_elapsed_minutes=unit.receive_elapsed_minutes,
+        last_send_at=unit.last_send_at,
+        last_receive_at=unit.last_receive_at,
+        warning_threshold_minutes=warning_threshold_minutes,
+        critical_threshold_minutes=critical_threshold_minutes,
     )
 
 
@@ -69,4 +82,5 @@ def event_to_event_out(event: SyncEvent) -> EventOut:
         occurred_at=event.created_at or event.started_at or event.resolved_at,
         reason=event.message,
         response_time_ms=None,
+        duration_seconds=event.duration_seconds,
     )

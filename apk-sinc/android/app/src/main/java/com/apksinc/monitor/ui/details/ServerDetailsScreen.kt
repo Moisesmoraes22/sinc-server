@@ -26,10 +26,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.apksinc.monitor.domain.ServerStatus
 import com.apksinc.monitor.ui.ViewModelFactoryProvider
+import com.apksinc.monitor.ui.components.SectionLabel
 import com.apksinc.monitor.ui.components.StatusBadge
+import com.apksinc.monitor.ui.components.statusColorsFor
 import com.apksinc.monitor.ui.theme.ApkSincColors
-import com.apksinc.monitor.util.formatDuration
+import com.apksinc.monitor.util.formatElapsedMinutesShort
 import com.apksinc.monitor.util.formatTimeOnly
 
 @Composable
@@ -74,21 +77,30 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
                 }
 
                 item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(colors.card, RoundedCornerShape(16.dp))
-                            .padding(16.dp),
-                    ) {
-                        KvRow("Sincronizado há", formatDuration(server.lastCheck))
-                        KvRow("Última checagem", formatTimeOnly(server.lastCheck))
-                        KvRow("Última queda", formatTimeOnly(server.lastDownAt))
-                        KvRow("Última normalização", formatTimeOnly(server.lastUpAt))
-                        KvRow("Quedas registradas", server.downCount.toString(), isLast = true)
-                    }
+                    SyncDirectionCard(
+                        title = "Envio",
+                        status = server.sendStatus,
+                        elapsedMinutes = server.sendElapsedMinutes,
+                        lastAt = server.lastSendAt,
+                        lastLabel = "Último envio às",
+                        warningThresholdMinutes = server.warningThresholdMinutes,
+                        criticalThresholdMinutes = server.criticalThresholdMinutes,
+                    )
                 }
 
-                item { com.apksinc.monitor.ui.components.SectionLabel("Histórico recente") }
+                item {
+                    SyncDirectionCard(
+                        title = "Recebimento",
+                        status = server.receiveStatus,
+                        elapsedMinutes = server.receiveElapsedMinutes,
+                        lastAt = server.lastReceiveAt,
+                        lastLabel = "Último recebimento às",
+                        warningThresholdMinutes = server.warningThresholdMinutes,
+                        criticalThresholdMinutes = server.criticalThresholdMinutes,
+                    )
+                }
+
+                item { SectionLabel("Histórico recente") }
 
                 if (state.events.isEmpty()) {
                     item {
@@ -106,20 +118,62 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
     }
 }
 
+/**
+ * Cartao de uma direcao de sincronizacao (envio ou recebimento): numero
+ * grande com o tempo decorrido (cor = severidade), pill de status e o
+ * horario do ultimo evento, com o limite configurado quando o estado nao
+ * e normal - da pra pessoa entender o "porque" sem abrir outra tela.
+ */
 @Composable
-private fun KvRow(label: String, value: String, isLast: Boolean = false) {
+private fun SyncDirectionCard(
+    title: String,
+    status: ServerStatus?,
+    elapsedMinutes: Double?,
+    lastAt: String?,
+    lastLabel: String,
+    warningThresholdMinutes: Int?,
+    criticalThresholdMinutes: Int?,
+) {
     val colors = ApkSincColors.colors
-    Row(
+    val effectiveStatus = status ?: ServerStatus.ONLINE
+    val valueColor = statusColorsFor(effectiveStatus).accent
+
+    val thresholdSuffix = when (effectiveStatus) {
+        ServerStatus.OFFLINE -> criticalThresholdMinutes?.let { " — limite crítico é $it min" } ?: ""
+        ServerStatus.ATENCAO -> warningThresholdMinutes?.let { " — limite de atenção é $it min" } ?: ""
+        ServerStatus.ONLINE -> ""
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .background(colors.card, RoundedCornerShape(16.dp))
+            .padding(16.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
-    }
-    if (!isLast) {
-        androidx.compose.material3.HorizontalDivider(color = colors.hairline)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                title.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textMuted,
+            )
+            if (status != null) StatusBadge(status = status)
+        }
+        Text(
+            formatElapsedMinutesShort(elapsedMinutes),
+            style = MaterialTheme.typography.headlineLarge,
+            color = valueColor,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            "$lastLabel ${formatTimeOnly(lastAt)}$thresholdSuffix",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textMuted,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
@@ -145,13 +199,21 @@ private fun TimelineRow(event: com.apksinc.monitor.domain.ServerEvent) {
                 color = colors.textPrimary,
             )
             Text(
-                formatTimeOnly(event.occurredAt),
+                formatTimeOnly(event.occurredAt) + (event.durationSeconds?.let { " · durou ${formatDurationSecondsShort(it)}" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textMuted,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
+}
+
+private fun formatDurationSecondsShort(seconds: Int): String {
+    val minutes = seconds / 60
+    if (minutes < 60) return "$minutes min"
+    val hours = minutes / 60
+    val remainder = minutes % 60
+    return if (remainder == 0) "${hours}h" else "${hours}h ${remainder}min"
 }
 
 private fun statusLabel(raw: String): String = when (raw) {

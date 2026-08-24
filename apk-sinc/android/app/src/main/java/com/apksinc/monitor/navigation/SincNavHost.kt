@@ -121,8 +121,8 @@ fun SincNavHost(startServerId: String? = null) {
             modifier = Modifier.padding(padding),
             // Troca de aba (irmãs, sem hierarquia): fade + leve escala, sem
             // direção lateral - efeito "shared axis" em vez de corte seco.
-            enterTransition = { fadeIn(tween(260)) + scaleIn(tween(260), initialScale = 0.96f) },
-            exitTransition = { fadeOut(tween(200)) + scaleOut(tween(200), targetScale = 1.03f) },
+            enterTransition = { fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.97f) },
+            exitTransition = { fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 1.02f) },
         ) {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(onServerClick = { id -> navController.navigate(Routes.details(id)) })
@@ -135,17 +135,17 @@ fun SincNavHost(startServerId: String? = null) {
                 Routes.ABOUT,
                 // Tela empilhada (push): desliza da direita e some para a
                 // esquerda, como uma navegação real, não um fade seco.
-                enterTransition = { slideInHorizontally(tween(320)) { it / 3 } + fadeIn(tween(320)) },
-                exitTransition = { slideOutHorizontally(tween(220)) { -it / 4 } + fadeOut(tween(150)) },
-                popEnterTransition = { slideInHorizontally(tween(320)) { -it / 4 } + fadeIn(tween(320)) },
-                popExitTransition = { slideOutHorizontally(tween(220)) { it / 3 } + fadeOut(tween(200)) },
+                enterTransition = { slideInHorizontally(tween(220)) { it / 3 } + fadeIn(tween(220)) },
+                exitTransition = { slideOutHorizontally(tween(160)) { -it / 4 } + fadeOut(tween(120)) },
+                popEnterTransition = { slideInHorizontally(tween(220)) { -it / 4 } + fadeIn(tween(220)) },
+                popExitTransition = { slideOutHorizontally(tween(160)) { it / 3 } + fadeOut(tween(140)) },
             ) { AboutScreen(onBack = { navController.popBackStack() }) }
             composable(
                 Routes.DETAILS,
-                enterTransition = { slideInHorizontally(tween(320)) { it / 3 } + fadeIn(tween(320)) },
-                exitTransition = { slideOutHorizontally(tween(220)) { -it / 4 } + fadeOut(tween(150)) },
-                popEnterTransition = { slideInHorizontally(tween(320)) { -it / 4 } + fadeIn(tween(320)) },
-                popExitTransition = { slideOutHorizontally(tween(220)) { it / 3 } + fadeOut(tween(200)) },
+                enterTransition = { slideInHorizontally(tween(220)) { it / 3 } + fadeIn(tween(220)) },
+                exitTransition = { slideOutHorizontally(tween(160)) { -it / 4 } + fadeOut(tween(120)) },
+                popEnterTransition = { slideInHorizontally(tween(220)) { -it / 4 } + fadeIn(tween(220)) },
+                popExitTransition = { slideOutHorizontally(tween(160)) { it / 3 } + fadeOut(tween(140)) },
             ) { backStackEntry ->
                 val serverId = backStackEntry.arguments?.getString("serverId") ?: return@composable
                 ServerDetailsScreen(serverId = serverId, onBack = { navController.popBackStack() })

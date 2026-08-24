@@ -57,6 +57,14 @@ private fun ServerDto.toEntity() = ServerEntity(
     lastDownAt = lastDownAt,
     lastUpAt = lastUpAt,
     downCount = downCount,
+    sendStatus = sendStatus,
+    receiveStatus = receiveStatus,
+    sendElapsedMinutes = sendElapsedMinutes,
+    receiveElapsedMinutes = receiveElapsedMinutes,
+    lastSendAt = lastSendAt,
+    lastReceiveAt = lastReceiveAt,
+    warningThresholdMinutes = warningThresholdMinutes,
+    criticalThresholdMinutes = criticalThresholdMinutes,
 )
 
 private fun ServerEntity.toDomain() = ServerInfo(
@@ -68,6 +76,14 @@ private fun ServerEntity.toDomain() = ServerInfo(
     lastDownAt = lastDownAt,
     lastUpAt = lastUpAt,
     downCount = downCount,
+    sendStatus = sendStatus?.let { ServerStatus.fromRaw(it) },
+    receiveStatus = receiveStatus?.let { ServerStatus.fromRaw(it) },
+    sendElapsedMinutes = sendElapsedMinutes,
+    receiveElapsedMinutes = receiveElapsedMinutes,
+    lastSendAt = lastSendAt,
+    lastReceiveAt = lastReceiveAt,
+    warningThresholdMinutes = warningThresholdMinutes,
+    criticalThresholdMinutes = criticalThresholdMinutes,
 )
 
 private fun EventDto.toEntity() = EventEntity(
@@ -79,6 +95,7 @@ private fun EventDto.toEntity() = EventEntity(
     occurredAt = occurredAt,
     reason = reason,
     responseTimeMs = responseTimeMs,
+    durationSeconds = durationSeconds,
 )
 
 private fun EventEntity.toDomain() = ServerEvent(
@@ -90,4 +107,5 @@ private fun EventEntity.toDomain() = ServerEvent(
     occurredAt = occurredAt,
     reason = reason,
     responseTimeMs = responseTimeMs,
+    durationSeconds = durationSeconds,
 )

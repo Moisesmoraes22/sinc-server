@@ -11,6 +11,14 @@ data class ServerDto(
     @SerializedName("last_down_at") val lastDownAt: String?,
     @SerializedName("last_up_at") val lastUpAt: String?,
     @SerializedName("down_count") val downCount: Int,
+    @SerializedName("send_status") val sendStatus: String?,
+    @SerializedName("receive_status") val receiveStatus: String?,
+    @SerializedName("send_elapsed_minutes") val sendElapsedMinutes: Double?,
+    @SerializedName("receive_elapsed_minutes") val receiveElapsedMinutes: Double?,
+    @SerializedName("last_send_at") val lastSendAt: String?,
+    @SerializedName("last_receive_at") val lastReceiveAt: String?,
+    @SerializedName("warning_threshold_minutes") val warningThresholdMinutes: Int?,
+    @SerializedName("critical_threshold_minutes") val criticalThresholdMinutes: Int?,
 )
 
 data class ServerListResponseDto(
@@ -27,6 +35,7 @@ data class EventDto(
     @SerializedName("occurred_at") val occurredAt: String,
     val reason: String?,
     @SerializedName("response_time_ms") val responseTimeMs: Int?,
+    @SerializedName("duration_seconds") val durationSeconds: Int?,
 )
 
 data class EventListResponseDto(
