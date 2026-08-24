@@ -33,7 +33,7 @@ import com.apksinc.monitor.util.formatTimeOnly
  * marcacao lateral de proposito - so o que precisa de atencao chama atencao.
  */
 @Composable
-fun ServerCard(server: ServerInfo, onClick: () -> Unit) {
+fun ServerCard(server: ServerInfo, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = ApkSincColors.colors
     val barColor = when (server.status) {
         ServerStatus.OFFLINE -> colors.danger
@@ -46,7 +46,7 @@ fun ServerCard(server: ServerInfo, onClick: () -> Unit) {
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colors.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(
