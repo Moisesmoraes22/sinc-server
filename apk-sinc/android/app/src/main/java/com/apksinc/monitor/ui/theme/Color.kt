@@ -2,33 +2,33 @@ package com.apksinc.monitor.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Paleta oficial APK SINC v2 - identidade fixa, nao decorativa. Escala de
-// elevacao por luminosidade (sem depender de bordas) + cores funcionais com
-// significado unico em todo o app.
+// Paleta oficial APK SINC v3 (redesign premium) - identidade fixa, nao
+// decorativa. Escala de elevacao por luminosidade + bordas solidas sutis +
+// cores funcionais com significado unico em todo o app.
 
-val Background = Color(0xFF0A0C10)
-val Elevated = Color(0xFF131519)
-val Card = Color(0xFF17191E)
-val Interactive = Color(0xFF1C1F25)
+val Background = Color(0xFF080A0F)
+val Elevated = Color(0xFF11141B)
+val Card = Color(0xFF151820)
+val Interactive = Color(0xFF1B1F29)
 
-val TextPrimary = Color(0xFFF2F3F6)
-val TextSecondary = Color(0xFF969BA5)
-val TextMuted = Color(0xFF6B7078)
+val TextPrimary = Color(0xFFF8FAFC)
+val TextSecondary = Color(0xFF94A3B8)
+val TextMuted = Color(0xFF6B7484)
 
-val Hairline = Color(0x12FFFFFF)
-val HairlineStrong = Color(0x1FFFFFFF)
+val Hairline = Color(0xFF252A35)
+val HairlineStrong = Color(0xFF323847)
 
-val Accent = Color(0xFF2264F8) // CTA, selecao, navegacao ativa, identidade
-val AccentSoft = Color(0x262264F8)
+val Accent = Color(0xFF2563EB) // CTA, selecao, navegacao ativa, identidade
+val AccentSoft = Color(0x262563EB)
 
-val Success = Color(0xFF33D391) // normal / operacional
-val SuccessSoft = Color(0x2133D391)
+val Success = Color(0xFF22C55E) // normal / operacional
+val SuccessSoft = Color(0x2122C55E)
 
-val Warning = Color(0xFFEEB443) // atencao
-val WarningSoft = Color(0x21EEB443)
+val Warning = Color(0xFFF59E0B) // atencao
+val WarningSoft = Color(0x21F59E0B)
 
-val Danger = Color(0xFFEF5B60) // critico / offline
-val DangerSoft = Color(0x24EF5B60)
+val Danger = Color(0xFFEF4444) // critico / offline
+val DangerSoft = Color(0x24EF4444)
 
 // Variante clara (mesma identidade, superficies invertidas)
 val BackgroundLight = Color(0xFFF7F8FA)
