@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -92,9 +94,25 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}) {
             item { SectionLabel("Notificações") }
             item {
                 SettingsCard {
-                    SwitchRow("Notificações", settings.notificationsEnabled, ::requestOrEnableNotifications)
-                    SwitchRow("Som", settings.soundEnabled, viewModel::setSoundEnabled)
-                    SwitchRow("Vibração", settings.vibrationEnabled, viewModel::setVibrationEnabled)
+                    SwitchRow(
+                        label = "Notificações",
+                        subtitle = "Receber alertas e atualizações",
+                        checked = settings.notificationsEnabled,
+                        onCheckedChange = ::requestOrEnableNotifications,
+                    )
+                    SwitchRow(
+                        label = "Som",
+                        subtitle = "Ativar sons de alerta",
+                        checked = settings.soundEnabled,
+                        onCheckedChange = viewModel::setSoundEnabled,
+                    )
+                    SwitchRow(
+                        label = "Vibração",
+                        subtitle = "Vibrar em notificações",
+                        checked = settings.vibrationEnabled,
+                        onCheckedChange = viewModel::setVibrationEnabled,
+                        isLast = true,
+                    )
                 }
             }
 
@@ -105,7 +123,7 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}) {
                     Row(modifier = Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ThemeMode.entries.forEach { mode ->
                             ThemeChip(
-                                label = mode.name,
+                                label = themeModeLabel(mode),
                                 selected = settings.themeMode == mode,
                                 onClick = { viewModel.setThemeMode(mode) },
                             )
@@ -117,7 +135,10 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}) {
             item { SectionLabel("Monitoramento") }
             item {
                 SettingsCard {
-                    InfoRow("Intervalo de atualização", "${settings.refreshIntervalSeconds}s")
+                    IntervalStepper(
+                        seconds = settings.refreshIntervalSeconds,
+                        onChange = viewModel::setRefreshIntervalSeconds,
+                    )
                 }
             }
 
@@ -172,25 +193,84 @@ private fun SettingsCard(
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SwitchRow(
+    label: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    isLast: Boolean = false,
+) {
     val colors = ApkSincColors.colors
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textMuted,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
         Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedTrackColor = colors.accent))
+    }
+    if (!isLast) androidx.compose.material3.HorizontalDivider(color = colors.hairline)
+}
+
+private val REFRESH_INTERVAL_OPTIONS = listOf(15, 30, 60, 120, 300)
+
+@Composable
+private fun IntervalStepper(seconds: Int, onChange: (Int) -> Unit) {
+    val colors = ApkSincColors.colors
+    val currentIndex = REFRESH_INTERVAL_OPTIONS.indexOf(seconds).let { if (it == -1) 1 else it }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column {
+            Text("Intervalo de atualização", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+            Text(
+                "Com que frequência o Dashboard busca dados novos",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textMuted,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onChange(REFRESH_INTERVAL_OPTIONS[(currentIndex - 1).coerceAtLeast(0)]) },
+                enabled = currentIndex > 0,
+            ) {
+                Icon(Icons.Filled.ChevronLeft, contentDescription = "Diminuir intervalo", tint = colors.textSecondary)
+            }
+            Text(
+                formatIntervalLabel(REFRESH_INTERVAL_OPTIONS[currentIndex]),
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.textPrimary,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+            IconButton(
+                onClick = { onChange(REFRESH_INTERVAL_OPTIONS[(currentIndex + 1).coerceAtMost(REFRESH_INTERVAL_OPTIONS.lastIndex)]) },
+                enabled = currentIndex < REFRESH_INTERVAL_OPTIONS.lastIndex,
+            ) {
+                Icon(Icons.Filled.ChevronRight, contentDescription = "Aumentar intervalo", tint = colors.textSecondary)
+            }
+        }
     }
 }
 
-@Composable
-private fun InfoRow(label: String, value: String) {
-    val colors = ApkSincColors.colors
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
-    }
+private fun formatIntervalLabel(seconds: Int): String =
+    if (seconds < 60) "${seconds}s" else "${seconds / 60}min"
+
+private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
+    ThemeMode.SYSTEM -> "Sistema"
+    ThemeMode.LIGHT -> "Claro"
+    ThemeMode.DARK -> "Escuro"
 }
 
 @Composable

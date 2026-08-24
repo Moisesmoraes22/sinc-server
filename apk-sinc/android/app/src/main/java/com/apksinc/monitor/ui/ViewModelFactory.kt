@@ -16,7 +16,7 @@ class SincViewModelFactory(
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T = when (modelClass) {
-        DashboardViewModel::class.java -> DashboardViewModel(repository) as T
+        DashboardViewModel::class.java -> DashboardViewModel(repository, settingsDataStore) as T
         HistoryViewModel::class.java -> HistoryViewModel(repository) as T
         SettingsViewModel::class.java -> SettingsViewModel(settingsDataStore) as T
         else -> throw IllegalArgumentException("ViewModel desconhecido: $modelClass")
