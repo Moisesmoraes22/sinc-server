@@ -7,6 +7,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -81,7 +82,12 @@ fun SincNavHost(startServerId: String? = null) {
             val currentDestination = backStackEntry?.destination
             NavigationBar(
                 containerColor = colors.elevated,
+                // Insets zerados na NavigationBar (para ela nao inflar por
+                // dentro) + navigationBarsPadding por fora, de modo que a
+                // pill flutuante fique acima da barra de gestos do Android
+                // em vez de encostar nela.
                 modifier = Modifier
+                    .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .clip(RoundedCornerShape(24.dp)),
                 windowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),

@@ -45,9 +45,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apksinc.monitor.R
+import com.apksinc.monitor.domain.ServerStatus
 import com.apksinc.monitor.ui.ViewModelFactoryProvider
 import com.apksinc.monitor.ui.components.EmptyState
 import com.apksinc.monitor.ui.components.ErrorState
@@ -83,7 +85,17 @@ fun DashboardScreen(onServerClick: (String) -> Unit) {
                         enter = fadeIn(tween(200)) + expandVertically(tween(200)),
                         exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
                     ) {
-                        AlertBanner(offlineCount = state.offlineCount, attentionCount = state.attentionCount)
+                        AlertBanner(
+                            offlineCount = state.offlineCount,
+                            attentionCount = state.attentionCount,
+                            // A seta do card precisa levar a algum lugar: abre a
+                            // primeira unidade critica (ou de atencao) da lista.
+                            onClick = {
+                                val target = state.servers.firstOrNull { it.status == ServerStatus.OFFLINE }
+                                    ?: state.servers.firstOrNull { it.status == ServerStatus.ATENCAO }
+                                if (target != null) onServerClick(target.id)
+                            },
+                        )
                     }
                 }
 
@@ -136,17 +148,21 @@ private fun DashboardHeader(isLoading: Boolean, isConnected: Boolean, onRefresh:
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top,
     ) {
-        Column {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
             Text(
                 text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineMedium,
                 color = colors.textPrimary,
+                maxLines = 1,
             )
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
                 Text(
                     text = stringResource(R.string.app_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 Box(
                     modifier = Modifier
@@ -177,7 +193,7 @@ private fun DashboardHeader(isLoading: Boolean, isConnected: Boolean, onRefresh:
 }
 
 @Composable
-private fun AlertBanner(offlineCount: Int, attentionCount: Int) {
+private fun AlertBanner(offlineCount: Int, attentionCount: Int, onClick: () -> Unit) {
     val colors = ApkSincColors.colors
     val isCritical = offlineCount > 0
     val message = when {
@@ -191,7 +207,7 @@ private fun AlertBanner(offlineCount: Int, attentionCount: Int) {
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = {},
+                onClick = onClick,
             )
             .padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

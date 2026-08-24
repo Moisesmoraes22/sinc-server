@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -151,7 +152,7 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}, onApiStatusClick: () -> Unit =
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.Dns, contentDescription = null, tint = colors.textSecondary)
                             Column(modifier = Modifier.padding(start = 12.dp)) {
                                 Text("Status da API", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
@@ -304,17 +305,25 @@ private fun ThemeChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val colors = ApkSincColors.colors
     val bg = if (selected) colors.accentSoft else colors.elevated
     val textColor = if (selected) colors.accent else colors.textSecondary
+    // Mesmo padrao dos filtros do Historico: pill compacta, area de toque
+    // de 44dp no Box externo.
     androidx.compose.foundation.layout.Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(bg)
+            .defaultMinSize(minHeight = 44.dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
-            )
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = textColor)
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(bg)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = textColor)
+        }
     }
 }

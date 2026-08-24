@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -98,18 +99,26 @@ private fun FilterChipItem(label: String, selected: Boolean, onClick: () -> Unit
     val colors = ApkSincColors.colors
     val bg = if (selected) colors.accentSoft else colors.elevated
     val textColor = if (selected) colors.accent else colors.textSecondary
+    // A pill fica compacta, mas a area de toque respeita o minimo de 44dp -
+    // por isso o clickable mora no Box externo, nao na pill.
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(bg)
+            .defaultMinSize(minHeight = 44.dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
-            )
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = textColor)
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(bg)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = textColor)
+        }
     }
 }
 

@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apksinc.monitor.data.remote.HealthDto
@@ -143,8 +144,18 @@ private fun InfoRow(label: String, value: String, isFirst: Boolean = false, isLa
         modifier = Modifier.fillMaxWidth().padding(top = if (isFirst) 0.dp else 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textSecondary,
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textPrimary,
+            textAlign = TextAlign.End,
+        )
     }
     if (!isLast) {
         androidx.compose.material3.HorizontalDivider(color = colors.hairline, modifier = Modifier.padding(top = 10.dp))
