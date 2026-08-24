@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.apksinc.monitor.data.local.SettingsDataStore
 import com.apksinc.monitor.data.repository.ServerRepository
+import com.apksinc.monitor.ui.apistatus.ApiStatusViewModel
 import com.apksinc.monitor.ui.dashboard.DashboardViewModel
 import com.apksinc.monitor.ui.details.ServerDetailsViewModel
 import com.apksinc.monitor.ui.history.HistoryViewModel
@@ -19,6 +20,7 @@ class SincViewModelFactory(
         DashboardViewModel::class.java -> DashboardViewModel(repository, settingsDataStore) as T
         HistoryViewModel::class.java -> HistoryViewModel(repository) as T
         SettingsViewModel::class.java -> SettingsViewModel(settingsDataStore) as T
+        ApiStatusViewModel::class.java -> ApiStatusViewModel(repository) as T
         else -> throw IllegalArgumentException("ViewModel desconhecido: $modelClass")
     }
 }

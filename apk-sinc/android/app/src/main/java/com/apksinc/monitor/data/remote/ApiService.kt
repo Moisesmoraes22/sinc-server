@@ -8,6 +8,9 @@ import retrofit2.http.Query
 
 interface ApiService {
 
+    @GET("api/health")
+    suspend fun getHealth(): HealthDto
+
     @GET("api/servers")
     suspend fun getServers(): ServerListResponseDto
 

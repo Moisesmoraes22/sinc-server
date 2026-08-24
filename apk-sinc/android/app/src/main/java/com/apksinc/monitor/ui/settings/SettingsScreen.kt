@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,7 +49,7 @@ import com.apksinc.monitor.ui.components.SectionLabel
 import com.apksinc.monitor.ui.theme.ApkSincColors
 
 @Composable
-fun SettingsScreen(onAboutClick: () -> Unit = {}) {
+fun SettingsScreen(onAboutClick: () -> Unit = {}, onApiStatusClick: () -> Unit = {}) {
     val viewModel: SettingsViewModel = viewModel(factory = ViewModelFactoryProvider.factory())
     val settings by viewModel.settings.collectAsState()
     val colors = ApkSincColors.colors
@@ -139,6 +140,31 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}) {
                         seconds = settings.refreshIntervalSeconds,
                         onChange = viewModel::setRefreshIntervalSeconds,
                     )
+                }
+            }
+
+            item { SectionLabel("Diagnóstico") }
+            item {
+                SettingsCard(onClick = onApiStatusClick) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Dns, contentDescription = null, tint = colors.textSecondary)
+                            Column(modifier = Modifier.padding(start = 12.dp)) {
+                                Text("Status da API", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
+                                Text(
+                                    "Conexão, banco de dados e monitor",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textMuted,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                )
+                            }
+                        }
+                        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.textMuted)
+                    }
                 }
             }
 

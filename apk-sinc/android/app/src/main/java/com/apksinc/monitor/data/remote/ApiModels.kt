@@ -43,6 +43,17 @@ data class EventListResponseDto(
     val events: List<EventDto>,
 )
 
+data class HealthDto(
+    val status: String,
+    val database: String,
+    val monitor: String,
+    val firebase: String,
+    @SerializedName("source_mode") val sourceMode: String,
+    @SerializedName("db_backend") val dbBackend: String,
+    @SerializedName("last_poll_at") val lastPollAt: String?,
+    @SerializedName("units_count") val unitsCount: Int,
+)
+
 data class DeviceRegisterRequestDto(
     val token: String,
     val platform: String = "android",

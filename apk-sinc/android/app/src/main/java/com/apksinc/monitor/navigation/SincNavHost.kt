@@ -39,6 +39,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.apksinc.monitor.R
 import com.apksinc.monitor.ui.about.AboutScreen
+import com.apksinc.monitor.ui.apistatus.ApiStatusScreen
 import com.apksinc.monitor.ui.dashboard.DashboardScreen
 import com.apksinc.monitor.ui.details.ServerDetailsScreen
 import com.apksinc.monitor.ui.history.HistoryScreen
@@ -50,6 +51,7 @@ private object Routes {
     const val HISTORY = "history"
     const val SETTINGS = "settings"
     const val ABOUT = "about"
+    const val API_STATUS = "api_status"
     const val DETAILS = "details/{serverId}"
     fun details(serverId: String) = "details/$serverId"
 }
@@ -129,7 +131,10 @@ fun SincNavHost(startServerId: String? = null) {
             }
             composable(Routes.HISTORY) { HistoryScreen() }
             composable(Routes.SETTINGS) {
-                SettingsScreen(onAboutClick = { navController.navigate(Routes.ABOUT) })
+                SettingsScreen(
+                    onAboutClick = { navController.navigate(Routes.ABOUT) },
+                    onApiStatusClick = { navController.navigate(Routes.API_STATUS) },
+                )
             }
             composable(
                 Routes.ABOUT,
@@ -140,6 +145,13 @@ fun SincNavHost(startServerId: String? = null) {
                 popEnterTransition = { slideInHorizontally(tween(220)) { -it / 4 } + fadeIn(tween(220)) },
                 popExitTransition = { slideOutHorizontally(tween(160)) { it / 3 } + fadeOut(tween(140)) },
             ) { AboutScreen(onBack = { navController.popBackStack() }) }
+            composable(
+                Routes.API_STATUS,
+                enterTransition = { slideInHorizontally(tween(220)) { it / 3 } + fadeIn(tween(220)) },
+                exitTransition = { slideOutHorizontally(tween(160)) { -it / 4 } + fadeOut(tween(120)) },
+                popEnterTransition = { slideInHorizontally(tween(220)) { -it / 4 } + fadeIn(tween(220)) },
+                popExitTransition = { slideOutHorizontally(tween(160)) { it / 3 } + fadeOut(tween(140)) },
+            ) { ApiStatusScreen(onBack = { navController.popBackStack() }) }
             composable(
                 Routes.DETAILS,
                 enterTransition = { slideInHorizontally(tween(220)) { it / 3 } + fadeIn(tween(220)) },
