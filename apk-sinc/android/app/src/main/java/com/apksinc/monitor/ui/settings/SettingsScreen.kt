@@ -258,10 +258,10 @@ private fun IntervalStepper(seconds: Int, onChange: (Int) -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
+        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
             Text("Intervalo de atualização", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
             Text(
-                "Com que frequência o Dashboard busca dados novos",
+                "Com que frequência os dados são atualizados",
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textMuted,
                 modifier = Modifier.padding(top = 1.dp),
