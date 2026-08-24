@@ -70,7 +70,9 @@ fun SincNavHost(startServerId: String? = null) {
             val currentDestination = backStackEntry?.destination
             NavigationBar(
                 containerColor = colors.elevated,
-                modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .clip(RoundedCornerShape(28.dp)),
             ) {
                 bottomTabs.forEach { tab ->
                     val selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true
