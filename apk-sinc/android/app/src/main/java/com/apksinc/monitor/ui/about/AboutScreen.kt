@@ -1,6 +1,7 @@
 package com.apksinc.monitor.ui.about
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,12 +53,14 @@ fun AboutScreen(onBack: () -> Unit) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 Image(
-                    painter = painterResource(R.drawable.logo_omega),
+                    painter = painterResource(R.drawable.logo_omg_sinc),
                     contentDescription = stringResource(R.string.app_name),
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
-                        .size(120.dp)
-                        .clip(RoundedCornerShape(20.dp)),
+                        .size(160.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(colors.accent)
+                        .padding(20.dp),
                 )
 
                 Text(

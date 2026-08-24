@@ -93,8 +93,8 @@ fun ServerCard(server: ServerInfo, onClick: () -> Unit) {
                         )
                     } else {
                         MetaItem(
-                            label = stringRes(R.string.label_response_time),
-                            value = server.responseTimeMs?.let { "$it ms" } ?: "--",
+                            label = stringRes(R.string.label_synced_ago),
+                            value = formatDuration(server.lastCheck),
                         )
                     }
                     MetaItem(

@@ -19,6 +19,7 @@
     <string name="status_offline">OFFLINE</string>
 
     <string name="label_response_time">Resposta</string>
+    <string name="label_synced_ago">Sincronizado ha</string>
     <string name="label_last_check">Ultima checagem</string>
     <string name="label_offline_since">Offline ha</string>
 

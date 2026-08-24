@@ -29,6 +29,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apksinc.monitor.ui.ViewModelFactoryProvider
 import com.apksinc.monitor.ui.components.StatusBadge
 import com.apksinc.monitor.ui.theme.ApkSincColors
+import com.apksinc.monitor.util.formatDuration
 import com.apksinc.monitor.util.formatTimeOnly
 
 @Composable
@@ -79,7 +80,7 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
                             .background(colors.card, RoundedCornerShape(16.dp))
                             .padding(16.dp),
                     ) {
-                        KvRow("Tempo de resposta", server.responseTimeMs?.let { "$it ms" } ?: "--")
+                        KvRow("Sincronizado há", formatDuration(server.lastCheck))
                         KvRow("Última checagem", formatTimeOnly(server.lastCheck))
                         KvRow("Última queda", formatTimeOnly(server.lastDownAt))
                         KvRow("Última normalização", formatTimeOnly(server.lastUpAt))
