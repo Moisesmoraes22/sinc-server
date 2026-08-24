@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-enum class HistoryFilter { ALL, ONLINE, OFFLINE }
+enum class HistoryFilter { ALL, ONLINE, ATENCAO, OFFLINE }
 
 data class HistoryUiState(
     val events: List<ServerEvent> = emptyList(),
@@ -22,6 +22,7 @@ data class HistoryUiState(
         get() = when (filter) {
             HistoryFilter.ALL -> events
             HistoryFilter.ONLINE -> events.filter { it.toStatus == "ONLINE" }
+            HistoryFilter.ATENCAO -> events.filter { it.toStatus == "ATENCAO" }
             HistoryFilter.OFFLINE -> events.filter { it.toStatus == "OFFLINE" }
         }
 }
