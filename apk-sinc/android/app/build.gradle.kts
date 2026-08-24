@@ -23,7 +23,7 @@ fun localProperty(name: String, default: String): String =
 
 android {
     namespace = "com.apksinc.monitor"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.apksinc.monitor"
