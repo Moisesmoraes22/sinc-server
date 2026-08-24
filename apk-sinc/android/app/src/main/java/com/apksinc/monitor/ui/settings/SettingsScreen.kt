@@ -27,9 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apksinc.monitor.BuildConfig
+import com.apksinc.monitor.R
 import com.apksinc.monitor.data.local.ThemeMode
 import com.apksinc.monitor.ui.ViewModelFactoryProvider
 import com.apksinc.monitor.ui.components.SectionLabel
@@ -90,7 +92,7 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column {
-                            Text("APK SINC", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
+                            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
                             Text(
                                 "Versão ${BuildConfig.VERSION_NAME}",
                                 style = MaterialTheme.typography.bodySmall,

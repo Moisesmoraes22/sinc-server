@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">APK SINC</string>
+    <string name="app_name">OMG SINC</string>
     <string name="app_subtitle">Monitoramento de Servidores</string>
     <string name="notification_channel_id">sinc_alerts</string>
     <string name="notification_channel_name">Alertas de Servidores</string>

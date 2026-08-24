@@ -1,31 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Icone: servidor (rack) com indicador de sincronizacao/conexao -->
+<!-- Icone: marca OMG SINC (coracao) em branco sobre o fundo azul do adaptive-icon -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#0F172A"
-        android:pathData="M0,0h108v108h-108z" />
-
-    <!-- corpo do servidor (rack) -->
-    <path
-        android:fillColor="#38BDF8"
-        android:pathData="M34,30h40a4,4 0,0 1,4 4v10a4,4 0,0 1,-4 4h-40a4,4 0,0 1,-4 -4v-10a4,4 0,0 1,4 -4z" />
-    <path
-        android:fillColor="#0EA5E9"
-        android:pathData="M34,52h40a4,4 0,0 1,4 4v10a4,4 0,0 1,-4 4h-40a4,4 0,0 1,-4 -4v-10a4,4 0,0 1,4 -4z" />
-
-    <!-- luzes de status -->
-    <path android:fillColor="#22C55E" android:pathData="M41,39m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
-    <path android:fillColor="#22C55E" android:pathData="M41,61m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
-
-    <!-- setas de sincronizacao -->
-    <path
-        android:fillColor="#F8FAFC"
-        android:pathData="M60,39c0,-4.4 3.6,-8 8,-8c3,0 5.6,1.7 7,4.2l2.4,-1.4l0.6,7.9 -7.4,-2.4l2.3,-1.3c-1,-1.7 -2.8,-2.9 -4.9,-2.9c-2.8,0 -5.1,2 -5.7,4.6z" />
-    <path
-        android:fillColor="#F8FAFC"
-        android:pathData="M76,61c0,4.4 -3.6,8 -8,8c-3,0 -5.6,-1.7 -7,-4.2l-2.4,1.4l-0.6,-7.9 7.4,2.4 -2.3,1.3c1,1.7 2.8,2.9 4.9,2.9c2.8,0 5.1,-2 5.7,-4.6z" />
+    <group
+        android:translateX="32"
+        android:translateY="32"
+        android:scaleX="1.8333"
+        android:scaleY="1.8333">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z" />
+    </group>
 </vector>

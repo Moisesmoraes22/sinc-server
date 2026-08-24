@@ -1,5 +1,12 @@
 package com.apksinc.monitor.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -113,6 +120,10 @@ fun SincNavHost(startServerId: String? = null) {
             navController = navController,
             startDestination = Routes.DASHBOARD,
             modifier = Modifier.padding(padding),
+            // Troca de aba (irmãs, sem hierarquia): fade + leve escala, sem
+            // direção lateral - efeito "shared axis" em vez de corte seco.
+            enterTransition = { fadeIn(tween(260)) + scaleIn(tween(260), initialScale = 0.96f) },
+            exitTransition = { fadeOut(tween(200)) + scaleOut(tween(200), targetScale = 1.03f) },
         ) {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(onServerClick = { id -> navController.navigate(Routes.details(id)) })
@@ -121,8 +132,22 @@ fun SincNavHost(startServerId: String? = null) {
             composable(Routes.SETTINGS) {
                 SettingsScreen(onAboutClick = { navController.navigate(Routes.ABOUT) })
             }
-            composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.DETAILS) { backStackEntry ->
+            composable(
+                Routes.ABOUT,
+                // Tela empilhada (push): desliza da direita e some para a
+                // esquerda, como uma navegação real, não um fade seco.
+                enterTransition = { slideInHorizontally(tween(320)) { it / 3 } + fadeIn(tween(320)) },
+                exitTransition = { slideOutHorizontally(tween(220)) { -it / 4 } + fadeOut(tween(150)) },
+                popEnterTransition = { slideInHorizontally(tween(320)) { -it / 4 } + fadeIn(tween(320)) },
+                popExitTransition = { slideOutHorizontally(tween(220)) { it / 3 } + fadeOut(tween(200)) },
+            ) { AboutScreen(onBack = { navController.popBackStack() }) }
+            composable(
+                Routes.DETAILS,
+                enterTransition = { slideInHorizontally(tween(320)) { it / 3 } + fadeIn(tween(320)) },
+                exitTransition = { slideOutHorizontally(tween(220)) { -it / 4 } + fadeOut(tween(150)) },
+                popEnterTransition = { slideInHorizontally(tween(320)) { -it / 4 } + fadeIn(tween(320)) },
+                popExitTransition = { slideOutHorizontally(tween(220)) { it / 3 } + fadeOut(tween(200)) },
+            ) { backStackEntry ->
                 val serverId = backStackEntry.arguments?.getString("serverId") ?: return@composable
                 ServerDetailsScreen(serverId = serverId, onBack = { navController.popBackStack() })
             }
