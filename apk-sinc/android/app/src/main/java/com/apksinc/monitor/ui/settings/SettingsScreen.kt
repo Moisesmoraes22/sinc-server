@@ -1,5 +1,10 @@
 package com.apksinc.monitor.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -21,14 +26,17 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apksinc.monitor.BuildConfig
 import com.apksinc.monitor.R
@@ -42,6 +50,36 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}) {
     val viewModel: SettingsViewModel = viewModel(factory = ViewModelFactoryProvider.factory())
     val settings by viewModel.settings.collectAsState()
     val colors = ApkSincColors.colors
+    val context = LocalContext.current
+
+    fun hasNotificationPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    // Pede a permissao do sistema so quando a pessoa esta de fato olhando
+    // pra secao de notificacoes (nao no primeiro abrir do app) - segue o
+    // toque na chave e tambem sincroniza se a chave ja estava "ligada" por
+    // padrao mas a permissao do SO nunca foi concedida.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> viewModel.setNotificationsEnabled(granted) }
+
+    fun requestOrEnableNotifications(wantsEnabled: Boolean) {
+        if (!wantsEnabled) {
+            viewModel.setNotificationsEnabled(false)
+        } else if (hasNotificationPermission()) {
+            viewModel.setNotificationsEnabled(true)
+        } else {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    LaunchedEffect(settings.notificationsEnabled) {
+        if (settings.notificationsEnabled && !hasNotificationPermission()) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     Scaffold(containerColor = colors.background) { padding ->
         LazyColumn(
@@ -54,7 +92,7 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}) {
             item { SectionLabel("Notificações") }
             item {
                 SettingsCard {
-                    SwitchRow("Notificações", settings.notificationsEnabled, viewModel::setNotificationsEnabled)
+                    SwitchRow("Notificações", settings.notificationsEnabled, ::requestOrEnableNotifications)
                     SwitchRow("Som", settings.soundEnabled, viewModel::setSoundEnabled)
                     SwitchRow("Vibração", settings.vibrationEnabled, viewModel::setVibrationEnabled)
                 }
