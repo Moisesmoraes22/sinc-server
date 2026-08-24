@@ -1,6 +1,7 @@
 package com.apksinc.monitor.util
 
 import retrofit2.HttpException
+import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
@@ -12,8 +13,8 @@ import java.net.UnknownHostException
 fun friendlyErrorMessage(t: Throwable): String = when (t) {
     is SocketTimeoutException ->
         "O servidor demorou demais para responder. Verifique sua internet e tente de novo."
-    is UnknownHostException ->
-        "Sem conexão com o servidor. Verifique sua internet e tente de novo."
+    is UnknownHostException, is ConnectException ->
+        "Não foi possível conectar ao servidor. Verifique sua internet e tente de novo."
     is HttpException -> when (t.code()) {
         401 -> "Acesso não autorizado ao servidor. Fale com o suporte."
         in 500..599 -> "O servidor está com problemas no momento. Tente novamente em instantes."
