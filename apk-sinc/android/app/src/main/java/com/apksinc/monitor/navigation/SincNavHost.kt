@@ -1,6 +1,8 @@
 package com.apksinc.monitor.navigation
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
@@ -10,6 +12,7 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -71,8 +74,9 @@ fun SincNavHost(startServerId: String? = null) {
             NavigationBar(
                 containerColor = colors.elevated,
                 modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .clip(RoundedCornerShape(28.dp)),
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .height(64.dp),
             ) {
                 bottomTabs.forEach { tab ->
                     val selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true
@@ -89,9 +93,10 @@ fun SincNavHost(startServerId: String? = null) {
                             Icon(
                                 imageVector = if (selected) tab.iconSelected else tab.iconUnselected,
                                 contentDescription = null,
+                                modifier = Modifier.size(20.dp),
                             )
                         },
-                        label = { Text(stringResource(tab.labelRes)) },
+                        label = { Text(stringResource(tab.labelRes), style = MaterialTheme.typography.labelSmall) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = colors.accent,
                             selectedTextColor = colors.accent,
