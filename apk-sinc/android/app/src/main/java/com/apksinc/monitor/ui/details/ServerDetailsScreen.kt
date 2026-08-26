@@ -3,6 +3,8 @@ package com.apksinc.monitor.ui.details
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -51,10 +56,14 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = colors.textSecondary)
+                }
+                IconButton(onClick = viewModel::refresh, enabled = !state.isLoading) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Atualizar", tint = colors.textSecondary)
                 }
             }
 
@@ -68,6 +77,10 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
             }
 
             LazyColumn(contentPadding = PaddingValues(20.dp, 0.dp, 20.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                state.error?.let { message ->
+                    item { StaleDataBanner(message = message, onRetry = viewModel::refresh) }
+                }
+
                 item {
                     Column {
                         Text(server.name, style = MaterialTheme.typography.headlineMedium, color = colors.textPrimary)
@@ -125,6 +138,35 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Avisa quando a ultima tentativa de atualizar falhou, para que os dados
+ * exibidos (que continuam sendo os do cache local) nao pareçam "ao vivo"
+ * quando na verdade podem estar horas desatualizados.
+ */
+@Composable
+private fun StaleDataBanner(message: String, onRetry: () -> Unit) {
+    val colors = ApkSincColors.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.warningSoft, RoundedCornerShape(14.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onRetry,
+            )
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = colors.warning, modifier = Modifier.padding(end = 10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Dados podem estar desatualizados", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+            Text(message, style = MaterialTheme.typography.bodySmall, color = colors.textMuted, modifier = Modifier.padding(top = 2.dp))
+        }
+        Text("Tentar de novo", style = MaterialTheme.typography.labelMedium, color = colors.accent)
     }
 }
 
