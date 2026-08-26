@@ -69,6 +69,7 @@ def unit_to_server_out(
         last_receive_at=unit.last_receive_at,
         warning_threshold_minutes=warning_threshold_minutes,
         critical_threshold_minutes=critical_threshold_minutes,
+        revisions_to_send=unit.revisions_to_send,
     )
 
 

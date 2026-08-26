@@ -102,6 +102,7 @@ class ServerOut(BaseModel):
     last_receive_at: datetime | None = None
     warning_threshold_minutes: int | None = None
     critical_threshold_minutes: int | None = None
+    revisions_to_send: int | None = None
 
 
 class ServerListResponse(BaseModel):

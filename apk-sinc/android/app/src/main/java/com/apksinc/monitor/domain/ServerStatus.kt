@@ -32,6 +32,7 @@ data class ServerInfo(
     val lastReceiveAt: String?,
     val warningThresholdMinutes: Int?,
     val criticalThresholdMinutes: Int?,
+    val revisionsToSend: Int?,
 )
 
 data class ServerEvent(

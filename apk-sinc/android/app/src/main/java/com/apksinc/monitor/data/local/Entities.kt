@@ -21,6 +21,7 @@ data class ServerEntity(
     val lastReceiveAt: String?,
     val warningThresholdMinutes: Int?,
     val criticalThresholdMinutes: Int?,
+    val revisionsToSend: Int?,
 )
 
 @Entity(tableName = "events")

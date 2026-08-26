@@ -19,6 +19,7 @@ data class ServerDto(
     @SerializedName("last_receive_at") val lastReceiveAt: String?,
     @SerializedName("warning_threshold_minutes") val warningThresholdMinutes: Int?,
     @SerializedName("critical_threshold_minutes") val criticalThresholdMinutes: Int?,
+    @SerializedName("revisions_to_send") val revisionsToSend: Int?,
 )
 
 data class ServerListResponseDto(

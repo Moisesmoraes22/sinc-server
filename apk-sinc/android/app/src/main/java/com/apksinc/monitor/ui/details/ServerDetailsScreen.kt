@@ -90,6 +90,7 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
                         lastLabel = "Último envio às",
                         warningThresholdMinutes = server.warningThresholdMinutes,
                         criticalThresholdMinutes = server.criticalThresholdMinutes,
+                        revisionsToSend = server.revisionsToSend,
                     )
                 }
 
@@ -142,6 +143,7 @@ private fun SyncDirectionCard(
     lastLabel: String,
     warningThresholdMinutes: Int?,
     criticalThresholdMinutes: Int?,
+    revisionsToSend: Int? = null,
 ) {
     val colors = ApkSincColors.colors
     val effectiveStatus = status ?: ServerStatus.ONLINE
@@ -184,6 +186,14 @@ private fun SyncDirectionCard(
             color = colors.textMuted,
             modifier = Modifier.padding(top = 4.dp),
         )
+        if (revisionsToSend != null) {
+            Text(
+                "$revisionsToSend revisão(ões) a enviar",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textMuted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
 

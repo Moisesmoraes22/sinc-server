@@ -78,6 +78,7 @@ private fun ServerDto.toEntity() = ServerEntity(
     lastReceiveAt = lastReceiveAt,
     warningThresholdMinutes = warningThresholdMinutes,
     criticalThresholdMinutes = criticalThresholdMinutes,
+    revisionsToSend = revisionsToSend,
 )
 
 private fun ServerEntity.toDomain() = ServerInfo(
@@ -97,6 +98,7 @@ private fun ServerEntity.toDomain() = ServerInfo(
     lastReceiveAt = lastReceiveAt,
     warningThresholdMinutes = warningThresholdMinutes,
     criticalThresholdMinutes = criticalThresholdMinutes,
+    revisionsToSend = revisionsToSend,
 )
 
 private fun EventDto.toEntity() = EventEntity(
