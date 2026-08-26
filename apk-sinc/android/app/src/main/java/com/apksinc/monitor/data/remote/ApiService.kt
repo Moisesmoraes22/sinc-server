@@ -17,6 +17,9 @@ interface ApiService {
     @GET("api/servers/{id}")
     suspend fun getServer(@Path("id") id: String): ServerDto
 
+    @GET("api/servers/{id}/uptime")
+    suspend fun getUptime(@Path("id") id: String, @Query("days") days: Int = 7): UptimeDto
+
     @GET("api/events")
     suspend fun getEvents(
         @Query("server_id") serverId: String? = null,

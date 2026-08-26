@@ -9,6 +9,7 @@ import com.apksinc.monitor.data.remote.EventDto
 import com.apksinc.monitor.data.remote.HealthDto
 import com.apksinc.monitor.data.remote.ServerDto
 import com.apksinc.monitor.data.remote.TestNotificationResponseDto
+import com.apksinc.monitor.data.remote.UptimeDto
 import com.apksinc.monitor.domain.ServerEvent
 import com.apksinc.monitor.domain.ServerInfo
 import com.apksinc.monitor.domain.ServerStatus
@@ -54,6 +55,10 @@ class ServerRepository(
     suspend fun getHealth(): HealthDto = api.getHealth()
 
     suspend fun sendTestNotification(): TestNotificationResponseDto = api.sendTestNotification()
+
+    // Mesma logica do getHealth() - estatistica calculada sob demanda no
+    // backend a partir do historico de eventos, nao faz sentido cachear.
+    suspend fun getUptime(serverId: String, days: Int = 7): UptimeDto = api.getUptime(serverId, days)
 }
 
 private fun ServerDto.toEntity() = ServerEntity(

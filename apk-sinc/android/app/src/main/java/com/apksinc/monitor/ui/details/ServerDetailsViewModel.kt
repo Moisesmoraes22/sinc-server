@@ -2,6 +2,7 @@ package com.apksinc.monitor.ui.details
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.apksinc.monitor.data.remote.UptimeDto
 import com.apksinc.monitor.data.repository.ServerRepository
 import com.apksinc.monitor.domain.ServerEvent
 import com.apksinc.monitor.domain.ServerInfo
@@ -16,6 +17,7 @@ data class ServerDetailsUiState(
     val server: ServerInfo? = null,
     val events: List<ServerEvent> = emptyList(),
     val isLoading: Boolean = false,
+    val uptime: UptimeDto? = null,
 )
 
 class ServerDetailsViewModel(
@@ -25,11 +27,12 @@ class ServerDetailsViewModel(
 
     private val serverFlow = MutableStateFlow<ServerInfo?>(null)
     private val loading = MutableStateFlow(false)
+    private val uptimeFlow = MutableStateFlow<UptimeDto?>(null)
 
     val uiState: StateFlow<ServerDetailsUiState> = combine(
-        serverFlow, repository.observeEventsForServer(serverId), loading,
-    ) { server, events, isLoading ->
-        ServerDetailsUiState(server = server, events = events, isLoading = isLoading)
+        serverFlow, repository.observeEventsForServer(serverId), loading, uptimeFlow,
+    ) { server, events, isLoading, uptime ->
+        ServerDetailsUiState(server = server, events = events, isLoading = isLoading, uptime = uptime)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ServerDetailsUiState())
 
     init {
@@ -45,6 +48,9 @@ class ServerDetailsViewModel(
                 serverFlow.value = repository.getServer(serverId)
             }
             loading.value = false
+        }
+        viewModelScope.launch {
+            runCatching { uptimeFlow.value = repository.getUptime(serverId, days = 7) }
         }
     }
 }

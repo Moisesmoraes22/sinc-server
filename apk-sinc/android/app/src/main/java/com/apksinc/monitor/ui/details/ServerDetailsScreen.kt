@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.apksinc.monitor.data.remote.UptimeDto
 import com.apksinc.monitor.domain.ServerStatus
 import com.apksinc.monitor.ui.ViewModelFactoryProvider
 import com.apksinc.monitor.ui.components.EmptyState
@@ -104,6 +105,10 @@ fun ServerDetailsScreen(serverId: String, onBack: () -> Unit) {
                     )
                 }
 
+                state.uptime?.let { uptime ->
+                    item { UptimeCard(uptime) }
+                }
+
                 item { SectionLabel("Histórico recente") }
 
                 if (state.events.isEmpty()) {
@@ -175,6 +180,46 @@ private fun SyncDirectionCard(
         )
         Text(
             "$lastLabel ${formatTimeOnly(lastAt)}$thresholdSuffix",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textMuted,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+/**
+ * Percentual de disponibilidade calculado no backend a partir do historico
+ * de eventos (nao ha coleta nova envolvida) - da uma nocao rapida de "essa
+ * unidade e estavel ou instavel" sem precisar rolar a linha do tempo toda.
+ */
+@Composable
+private fun UptimeCard(uptime: UptimeDto) {
+    val colors = ApkSincColors.colors
+    val valueColor = when {
+        uptime.uptimePercent >= 99.5 -> colors.success
+        uptime.uptimePercent >= 95.0 -> colors.warning
+        else -> colors.danger
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.card, RoundedCornerShape(16.dp))
+            .border(BorderStroke(1.dp, colors.hairline), RoundedCornerShape(16.dp))
+            .padding(16.dp),
+    ) {
+        Text(
+            "DISPONIBILIDADE (${uptime.periodDays} DIAS)".uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.textMuted,
+        )
+        Text(
+            "${uptime.uptimePercent}%",
+            style = MaterialTheme.typography.headlineLarge,
+            color = valueColor,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            "Fora do normal por ${formatDurationSecondsShort(uptime.downtimeSeconds)} nesse período",
             style = MaterialTheme.typography.bodySmall,
             color = colors.textMuted,
             modifier = Modifier.padding(top = 4.dp),

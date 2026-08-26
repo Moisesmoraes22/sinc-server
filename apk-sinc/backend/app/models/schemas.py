@@ -142,6 +142,12 @@ class DeviceRegisterRequest(BaseModel):
     platform: str = "android"
 
 
+class UptimeOut(BaseModel):
+    period_days: int
+    uptime_percent: float
+    downtime_seconds: int
+
+
 class MockScenarioRequest(BaseModel):
     """Permite forcar um cenario de teste no MockSourceClient em runtime."""
 

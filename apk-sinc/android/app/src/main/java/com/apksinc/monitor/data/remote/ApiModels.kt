@@ -63,3 +63,9 @@ data class TestNotificationResponseDto(
     val status: String,
     @SerializedName("devices_notified") val devicesNotified: Int,
 )
+
+data class UptimeDto(
+    @SerializedName("period_days") val periodDays: Int,
+    @SerializedName("uptime_percent") val uptimePercent: Double,
+    @SerializedName("downtime_seconds") val downtimeSeconds: Int,
+)
