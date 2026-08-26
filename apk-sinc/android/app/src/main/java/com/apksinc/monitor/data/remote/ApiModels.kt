@@ -58,3 +58,8 @@ data class DeviceRegisterRequestDto(
     val token: String,
     val platform: String = "android",
 )
+
+data class TestNotificationResponseDto(
+    val status: String,
+    @SerializedName("devices_notified") val devicesNotified: Int,
+)

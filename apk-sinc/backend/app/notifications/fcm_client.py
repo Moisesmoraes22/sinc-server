@@ -60,6 +60,33 @@ class FcmClient:
     def _dry_run_active(self) -> bool:
         return self.settings.fcm_dry_run or not os.path.exists(self.settings.firebase_credentials_path)
 
+    def send_test(self, device_tokens: list[str] | None = None) -> bool:
+        """Notificacao de teste disparada manualmente pela pessoa em
+        Configuracoes -> Testar notificacao - confirma que o caminho
+        completo (backend -> FCM -> celular) esta funcionando, sem precisar
+        esperar uma mudanca de status real acontecer."""
+        title = "🔔 Notificação de teste"
+        body = "Se você recebeu isso, as notificações do OMG SINC estão funcionando."
+        data = {"type": "test"}
+        tokens = device_tokens or []
+
+        if self._dry_run_active():
+            logger.info("[FCM dry-run] teste tokens=%d title=%r body=%r", len(tokens), title, body)
+            return True
+
+        from firebase_admin import messaging
+
+        _get_firebase_app()
+        notification = messaging.Notification(title=title, body=body)
+        success = True
+        for token in tokens:
+            try:
+                messaging.send(messaging.Message(notification=notification, data=data, token=token))
+            except Exception:
+                logger.exception("Falha ao enviar notificacao de teste para o token %s", token[:12])
+                success = False
+        return success
+
     def send_status_change(
         self, a7_code: str, business_unit: str, new_status: str, device_tokens: list[str] | None = None
     ) -> bool:

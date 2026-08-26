@@ -16,16 +16,21 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -53,8 +58,11 @@ import com.apksinc.monitor.ui.theme.ApkSincColors
 fun SettingsScreen(onAboutClick: () -> Unit = {}, onApiStatusClick: () -> Unit = {}) {
     val viewModel: SettingsViewModel = viewModel(factory = ViewModelFactoryProvider.factory())
     val settings by viewModel.settings.collectAsState()
+    val testNotificationState by viewModel.testNotificationState.collectAsState()
+    val testNotificationInFlight by viewModel.testNotificationInFlight.collectAsState()
     val colors = ApkSincColors.colors
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     fun hasNotificationPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -85,7 +93,27 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}, onApiStatusClick: () -> Unit =
         }
     }
 
-    Scaffold(containerColor = colors.background) { padding ->
+    LaunchedEffect(testNotificationState) {
+        val message = when (testNotificationState) {
+            TestNotificationResult.SENT -> "Notificação de teste enviada. Deve chegar em alguns segundos."
+            TestNotificationResult.NO_DEVICES -> "Nenhum dispositivo registrado para receber notificações."
+            TestNotificationResult.ERROR -> "Não foi possível enviar a notificação de teste."
+            null -> null
+        }
+        if (message != null) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearTestNotificationState()
+        }
+    }
+
+    Scaffold(
+        containerColor = colors.background,
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(snackbarData = data, containerColor = colors.card, contentColor = colors.textPrimary)
+            }
+        },
+    ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(20.dp),
@@ -113,7 +141,11 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}, onApiStatusClick: () -> Unit =
                         subtitle = "Vibrar em notificações",
                         checked = settings.vibrationEnabled,
                         onCheckedChange = viewModel::setVibrationEnabled,
-                        isLast = true,
+                    )
+                    androidx.compose.material3.HorizontalDivider(color = colors.hairline)
+                    TestNotificationRow(
+                        inFlight = testNotificationInFlight,
+                        onClick = viewModel::sendTestNotification,
                     )
                 }
             }
@@ -245,6 +277,35 @@ private fun SwitchRow(
         Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedTrackColor = colors.accent))
     }
     if (!isLast) androidx.compose.material3.HorizontalDivider(color = colors.hairline)
+}
+
+@Composable
+private fun TestNotificationRow(inFlight: Boolean, onClick: () -> Unit) {
+    val colors = ApkSincColors.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = !inFlight,
+                onClick = onClick,
+            ),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.settings_test_notification),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.accent,
+        )
+        if (inFlight) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.accent)
+        } else {
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.textMuted)
+        }
+    }
 }
 
 private val REFRESH_INTERVAL_OPTIONS = listOf(15, 30, 60, 120, 300)

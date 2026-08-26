@@ -26,4 +26,7 @@ interface ApiService {
 
     @POST("api/devices")
     suspend fun registerDevice(@Body request: DeviceRegisterRequestDto)
+
+    @POST("api/devices/test-notification")
+    suspend fun sendTestNotification(): TestNotificationResponseDto
 }

@@ -8,6 +8,7 @@ import com.apksinc.monitor.data.remote.DeviceRegisterRequestDto
 import com.apksinc.monitor.data.remote.EventDto
 import com.apksinc.monitor.data.remote.HealthDto
 import com.apksinc.monitor.data.remote.ServerDto
+import com.apksinc.monitor.data.remote.TestNotificationResponseDto
 import com.apksinc.monitor.domain.ServerEvent
 import com.apksinc.monitor.domain.ServerInfo
 import com.apksinc.monitor.domain.ServerStatus
@@ -51,6 +52,8 @@ class ServerRepository(
     // Diagnostico da infraestrutura - dado sempre ao vivo, nao faz sentido
     // cachear no Room (o ponto e saber o estado agora, nao o de ontem).
     suspend fun getHealth(): HealthDto = api.getHealth()
+
+    suspend fun sendTestNotification(): TestNotificationResponseDto = api.sendTestNotification()
 }
 
 private fun ServerDto.toEntity() = ServerEntity(

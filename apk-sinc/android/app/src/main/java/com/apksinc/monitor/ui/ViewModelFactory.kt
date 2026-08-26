@@ -19,7 +19,7 @@ class SincViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T = when (modelClass) {
         DashboardViewModel::class.java -> DashboardViewModel(repository, settingsDataStore) as T
         HistoryViewModel::class.java -> HistoryViewModel(repository) as T
-        SettingsViewModel::class.java -> SettingsViewModel(settingsDataStore) as T
+        SettingsViewModel::class.java -> SettingsViewModel(settingsDataStore, repository) as T
         ApiStatusViewModel::class.java -> ApiStatusViewModel(repository) as T
         else -> throw IllegalArgumentException("ViewModel desconhecido: $modelClass")
     }
