@@ -75,7 +75,19 @@ class MonitorService:
         settings = self.repository.get_settings()
 
         for reading in readings:
-            self._process_reading(reading, settings)
+            try:
+                self._process_reading(reading, settings)
+            except Exception:
+                # Um erro ao processar UMA unidade nao pode travar o ciclo
+                # inteiro - sem isso, qualquer excecao aqui interrompia o
+                # loop e todas as unidades seguintes na lista ficavam sem
+                # atualizar, silenciosamente, ciclo apos ciclo (foi assim
+                # que a unidade 01 ficou 2 dias parada sem nenhum aviso).
+                logger.exception(
+                    "Falha ao processar leitura da unidade %s (%s) - pulando para a proxima",
+                    reading.business_unit,
+                    reading.a7_code,
+                )
 
         return readings
 
