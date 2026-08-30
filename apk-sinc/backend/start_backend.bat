@@ -17,6 +17,12 @@ echo Subindo o backend APK SINC em http://0.0.0.0:8001 ...
 echo Deixe esta janela aberta. Feche-a para parar o servidor.
 echo.
 
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+REM Sem --reload de proposito: essa flag e para desenvolvimento (reinicia o
+REM processo sozinho a cada mudanca de arquivo detectada na pasta toda,
+REM incluindo .venv). Rodando 24/7 como servico, isso e um risco real - um
+REM reinicio automatico que trava faz o ciclo de checagem parar de vez, sem
+REM nenhum erro visivel (foi exatamente esse o padrao observado: unidades
+REM congeladas ha horas, sem mensagem de erro no log).
+uvicorn app.main:app --host 0.0.0.0 --port 8001
 
 pause
