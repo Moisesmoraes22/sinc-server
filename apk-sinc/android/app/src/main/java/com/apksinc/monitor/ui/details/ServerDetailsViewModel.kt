@@ -7,12 +7,20 @@ import com.apksinc.monitor.data.repository.ServerRepository
 import com.apksinc.monitor.domain.ServerEvent
 import com.apksinc.monitor.domain.ServerInfo
 import com.apksinc.monitor.util.friendlyErrorMessage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+// Tela de detalhe de uma unidade especifica - intervalo curto e fixo (nao
+// usa o intervalo configuravel em Ajustes, que e pensado pro Dashboard
+// inteiro) porque aqui a pessoa normalmente esta olhando de perto uma
+// unidade por um motivo (ex.: conferindo se "revisoes a enviar" esta
+// baixando), entao vale a pena atualizar com mais frequencia.
+private const val AUTO_REFRESH_INTERVAL_MS = 10_000L
 
 data class ServerDetailsUiState(
     val server: ServerInfo? = null,
@@ -40,6 +48,12 @@ class ServerDetailsViewModel(
 
     init {
         refresh()
+        viewModelScope.launch {
+            while (true) {
+                delay(AUTO_REFRESH_INTERVAL_MS)
+                refresh()
+            }
+        }
     }
 
     fun refresh() {
