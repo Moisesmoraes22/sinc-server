@@ -135,6 +135,8 @@ class HealthResponse(BaseModel):
     source_mode: str
     db_backend: str
     last_poll_at: datetime | None
+    last_successful_fetch_at: datetime | None
+    consecutive_fetch_failures: int
     units_count: int
 
 

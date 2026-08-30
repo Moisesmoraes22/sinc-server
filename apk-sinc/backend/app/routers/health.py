@@ -48,5 +48,7 @@ def health(repository: Repository = Depends(get_repository)) -> HealthResponse:
         source_mode=settings.source_mode,
         db_backend=settings.db_backend,
         last_poll_at=poller.last_poll_at if poller else None,
+        last_successful_fetch_at=poller.last_successful_fetch_at if poller else None,
+        consecutive_fetch_failures=poller.consecutive_fetch_failures if poller else 0,
         units_count=units_count,
     )

@@ -21,17 +21,33 @@ class Poller:
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         self.last_poll_at = None
+        # last_poll_at sozinho nao distingue "o ciclo rodou" de "o ciclo
+        # realmente trouxe dados" - fetch_units() pode falhar (ex.:
+        # Playwright travando apos rodar por horas) e run_check_cycle()
+        # absorve isso devolvendo lista vazia, entao o ciclo "roda" sem
+        # nunca atualizar nenhuma unidade. Esses dois campos existem pra
+        # essa diferenca aparecer no /api/health sem precisar de log ao vivo.
+        self.last_successful_fetch_at = None
+        self.consecutive_fetch_failures = 0
 
     async def _run_cycle_with_retry(self) -> None:
         attempts = max(1, self.retry_attempts)
         for attempt in range(1, attempts + 1):
             try:
-                await self.monitor_service.run_check_cycle()
+                readings = await self.monitor_service.run_check_cycle()
+                if readings:
+                    import datetime as _dt
+
+                    self.last_successful_fetch_at = _dt.datetime.now(_dt.timezone.utc)
+                    self.consecutive_fetch_failures = 0
+                else:
+                    self.consecutive_fetch_failures += 1
                 return
             except Exception:
                 logger.exception("Falha no ciclo de monitoramento (tentativa %d/%d)", attempt, attempts)
                 if attempt < attempts:
                     await asyncio.sleep(self.retry_backoff_seconds * attempt)
+        self.consecutive_fetch_failures += 1
 
     async def _loop(self) -> None:
         while not self._stop.is_set():
