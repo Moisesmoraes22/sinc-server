@@ -5,12 +5,52 @@ tabela/coluna correspondem exatamente ao schema criado pelas migrations em
 backend/supabase/migrations/.
 """
 
+import logging
+import time
 from datetime import datetime
+from typing import Any, Protocol
 
+import httpx
 from supabase import Client
 
 from app.database.supabase_client import get_supabase_client
 from app.models.domain import Device, MonitorSettings, SyncEvent, SyncUnit
+
+logger = logging.getLogger("sinc.supabase_repository")
+
+# Em producao (Windows) o cliente HTTP/2 usado pelo supabase-py falha de
+# forma intermitente com "httpx.ReadError: [WinError 10035]" - um erro de
+# socket nao-bloqueante que nao tem relacao com o dado sendo enviado, apenas
+# com o momento da leitura da resposta. Sem retry, uma unica ocorrencia
+# durante o ciclo de monitoramento derrubava o processamento daquela
+# unidade (e, antes do isolamento por unidade, do ciclo inteiro),
+# explicando unidades que ficavam paradas por horas/dias sem nenhum
+# problema real na fonte de dados.
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY_SECONDS = 0.4
+
+
+class _Executable(Protocol):
+    def execute(self) -> Any: ...
+
+
+def _execute_with_retry(query: _Executable) -> Any:
+    last_error: Exception | None = None
+    for attempt in range(_RETRY_ATTEMPTS):
+        try:
+            return query.execute()
+        except httpx.TransportError as exc:
+            last_error = exc
+            if attempt < _RETRY_ATTEMPTS - 1:
+                logger.warning(
+                    "Erro de rede transitorio ao chamar o Supabase (tentativa %d/%d): %s",
+                    attempt + 1,
+                    _RETRY_ATTEMPTS,
+                    exc,
+                )
+                time.sleep(_RETRY_BASE_DELAY_SECONDS * (attempt + 1))
+    assert last_error is not None
+    raise last_error
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -78,11 +118,11 @@ class SupabaseRepository:
         self._client = client or get_supabase_client()
 
     def get_unit(self, a7_code: str) -> SyncUnit | None:
-        result = self._client.table("sync_units").select("*").eq("a7_code", a7_code).limit(1).execute()
+        result = _execute_with_retry(self._client.table("sync_units").select("*").eq("a7_code", a7_code).limit(1))
         return _unit_from_row(result.data[0]) if result.data else None
 
     def list_units(self) -> list[SyncUnit]:
-        result = self._client.table("sync_units").select("*").order("business_unit").execute()
+        result = _execute_with_retry(self._client.table("sync_units").select("*").order("business_unit"))
         return [_unit_from_row(r) for r in result.data]
 
     def upsert_unit(self, unit: SyncUnit) -> SyncUnit:
@@ -100,7 +140,7 @@ class SupabaseRepository:
             "consecutive_failures": unit.consecutive_failures,
             "last_checked_at": _iso(unit.last_checked_at),
         }
-        result = self._client.table("sync_units").upsert(payload, on_conflict="a7_code").execute()
+        result = _execute_with_retry(self._client.table("sync_units").upsert(payload, on_conflict="a7_code"))
         return _unit_from_row(result.data[0])
 
     def add_event(self, event: SyncEvent) -> SyncEvent:
@@ -117,7 +157,7 @@ class SupabaseRepository:
             "duration_seconds": event.duration_seconds,
             "message": event.message,
         }
-        result = self._client.table("sync_events").insert(payload).execute()
+        result = _execute_with_retry(self._client.table("sync_events").insert(payload))
         return _event_from_row(result.data[0])
 
     def list_events(
@@ -128,36 +168,35 @@ class SupabaseRepository:
             query = query.eq("a7_code", unit_a7_code)
         if status:
             query = query.eq("new_status", status)
-        result = query.execute()
+        result = _execute_with_retry(query)
         return [_event_from_row(r) for r in result.data]
 
     def get_last_event_for_unit(self, a7_code: str) -> SyncEvent | None:
-        result = (
+        result = _execute_with_retry(
             self._client.table("sync_events")
             .select("*")
             .eq("a7_code", a7_code)
             .order("created_at", desc=True)
             .limit(1)
-            .execute()
         )
         return _event_from_row(result.data[0]) if result.data else None
 
     def register_device(self, fcm_token: str, device_name: str | None = None) -> Device:
         now = datetime.utcnow().isoformat()
         payload = {"fcm_token": fcm_token, "device_name": device_name, "active": True, "last_seen_at": now}
-        result = self._client.table("devices").upsert(payload, on_conflict="fcm_token").execute()
+        result = _execute_with_retry(self._client.table("devices").upsert(payload, on_conflict="fcm_token"))
         return _device_from_row(result.data[0])
 
     def list_devices(self) -> list[Device]:
-        result = self._client.table("devices").select("*").order("created_at").execute()
+        result = _execute_with_retry(self._client.table("devices").select("*").order("created_at"))
         return [_device_from_row(r) for r in result.data]
 
     def list_active_device_tokens(self) -> list[str]:
-        result = self._client.table("devices").select("fcm_token").eq("active", True).execute()
+        result = _execute_with_retry(self._client.table("devices").select("fcm_token").eq("active", True))
         return [r["fcm_token"] for r in result.data]
 
     def get_settings(self) -> MonitorSettings:
-        result = self._client.table("monitor_settings").select("*").eq("id", 1).limit(1).execute()
+        result = _execute_with_retry(self._client.table("monitor_settings").select("*").eq("id", 1).limit(1))
         if not result.data:
             return MonitorSettings()
         row = result.data[0]
@@ -174,12 +213,12 @@ class SupabaseRepository:
             "critical_threshold_minutes": settings.critical_threshold_minutes,
             "check_interval_seconds": settings.check_interval_seconds,
         }
-        self._client.table("monitor_settings").upsert(payload).execute()
+        _execute_with_retry(self._client.table("monitor_settings").upsert(payload))
         return settings
 
     def health_check(self) -> bool:
         try:
-            self._client.table("monitor_settings").select("id").limit(1).execute()
+            _execute_with_retry(self._client.table("monitor_settings").select("id").limit(1))
             return True
         except Exception:
             return False
