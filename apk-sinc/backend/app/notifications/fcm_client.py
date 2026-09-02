@@ -40,6 +40,26 @@ def _get_firebase_app():
     return _firebase_app
 
 
+def _android_config():
+    """Configuracao Android explicita para toda notificacao enviada.
+
+    Sem isso, o FCM pode entregar a mensagem com prioridade "normal", que em
+    Androids com gerenciamento agressivo de bateria/segundo plano (comum em
+    aparelhos Xiaomi/MIUI, mas nao so neles) pode ser adiada ou descartada
+    enquanto o app nao esta em primeiro plano - o padrao visto foi
+    notificacao chegando so com o app aberto e parando assim que fechado.
+    `priority="high"` pede entrega imediata, e o `channel_id` precisa bater
+    com o canal criado no app (SincApplication) para o Android respeitar a
+    importancia alta configurada la em vez de usar um canal padrao.
+    """
+    from firebase_admin import messaging
+
+    return messaging.AndroidConfig(
+        priority="high",
+        notification=messaging.AndroidNotification(channel_id="sinc_alerts"),
+    )
+
+
 def _build_notification(a7_code: str, business_unit: str, new_status: str) -> tuple[str, str]:
     if new_status == CRITICO:
         title = "🔴 UNIDADE CRÍTICA"
@@ -81,7 +101,7 @@ class FcmClient:
         success = True
         for token in tokens:
             try:
-                messaging.send(messaging.Message(notification=notification, data=data, token=token))
+                messaging.send(messaging.Message(notification=notification, data=data, token=token, android=_android_config()))
             except Exception:
                 logger.exception("Falha ao enviar notificacao de teste para o token %s", token[:12])
                 success = False
@@ -113,13 +133,17 @@ class FcmClient:
 
         for token in tokens:
             try:
-                messaging.send(messaging.Message(notification=notification, data=data, token=token))
+                messaging.send(messaging.Message(notification=notification, data=data, token=token, android=_android_config()))
             except Exception:
                 logger.exception("Falha ao enviar notificacao FCM para o token %s", token[:12])
                 success = False
 
         try:
-            messaging.send(messaging.Message(notification=notification, data=data, topic=self.settings.fcm_topic))
+            messaging.send(
+                messaging.Message(
+                    notification=notification, data=data, topic=self.settings.fcm_topic, android=_android_config()
+                )
+            )
         except Exception:
             logger.exception("Falha ao enviar notificacao FCM para o topico %s", self.settings.fcm_topic)
             success = False
