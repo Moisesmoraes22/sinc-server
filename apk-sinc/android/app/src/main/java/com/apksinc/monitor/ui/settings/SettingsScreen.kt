@@ -53,6 +53,7 @@ import com.apksinc.monitor.data.local.ThemeMode
 import com.apksinc.monitor.ui.ViewModelFactoryProvider
 import com.apksinc.monitor.ui.components.SectionLabel
 import com.apksinc.monitor.ui.theme.ApkSincColors
+import com.apksinc.monitor.util.BackgroundReliability
 
 @Composable
 fun SettingsScreen(onAboutClick: () -> Unit = {}, onApiStatusClick: () -> Unit = {}) {
@@ -146,6 +147,15 @@ fun SettingsScreen(onAboutClick: () -> Unit = {}, onApiStatusClick: () -> Unit =
                     TestNotificationRow(
                         inFlight = testNotificationInFlight,
                         onClick = viewModel::sendTestNotification,
+                    )
+                    androidx.compose.material3.HorizontalDivider(color = colors.hairline)
+                    ReliableNotificationsRow(
+                        onClick = {
+                            BackgroundReliability.requestIgnoreBatteryOptimizations(context)
+                            if (BackgroundReliability.isMiui()) {
+                                BackgroundReliability.openAutostartSettings(context)
+                            }
+                        },
                     )
                 }
             }
@@ -305,6 +315,38 @@ private fun TestNotificationRow(inFlight: Boolean, onClick: () -> Unit) {
         } else {
             Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.textMuted)
         }
+    }
+}
+
+@Composable
+private fun ReliableNotificationsRow(onClick: () -> Unit) {
+    val colors = ApkSincColors.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                stringResource(R.string.settings_reliable_notifications),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.accent,
+            )
+            Text(
+                stringResource(R.string.settings_reliable_notifications_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textMuted,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.textMuted)
     }
 }
 

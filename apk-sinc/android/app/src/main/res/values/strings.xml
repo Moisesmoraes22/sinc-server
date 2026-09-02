@@ -40,6 +40,8 @@
     <string name="settings_theme">Tema</string>
     <string name="settings_refresh_interval">Intervalo de atualizacao</string>
     <string name="settings_test_notification">Testar notificacao</string>
+    <string name="settings_reliable_notifications">Otimizar para notificações confiáveis</string>
+    <string name="settings_reliable_notifications_subtitle">Evita que o sistema bloqueie notificações com o app fechado</string>
     <string name="settings_about">Sobre</string>
 
     <string name="about_tagline">Monitoramento de Servidores</string>
